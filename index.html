@@ -532,6 +532,7 @@ main{max-width:900px;margin:0 auto;padding:16px;}
   .sd-wpnRow .sd-ws{font-size:12px;color:#a9b1c6;margin-top:1px;}
   .sd-stat{display:flex;align-items:center;gap:6px;margin-top:5px;font-size:9.5px;letter-spacing:.8px;color:#7d87a3;}
   .sd-stat i{display:block;height:4px;border-radius:2px;background:rgba(255,255,255,.1);flex:1;max-width:60px;overflow:hidden;}
+  .sd-stat-note{color:#5c6478;font-style:italic;}
   .sd-stat i b{display:block;height:100%;border-radius:2px;}
   .sd-tick{flex:none;width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;color:transparent;font-weight:900;font-size:15px;line-height:1;}
   .sd-wpnRow.sel .sd-tick{background:#ffcc00;border-color:#ffcc00;color:#1a1408;}
@@ -4254,7 +4255,7 @@ function startShadowDuel(mpMatchId, mpRole){
   <div id="sdTopBar">
     <button id="sdManualBtn" class="sd-ctrlBtn">❓ How to Play</button>
     <button id="sdComboToggle" class="sd-ctrlBtn"${mpOnline?' style="display:none;"':''}>🧩 Combo Builder</button>
-    <button id="sdWeaponBtn" class="sd-ctrlBtn"${mpOnline?' style="display:none;"':''}>🗡️ Weapon</button>
+    <button id="sdWeaponBtn" class="sd-ctrlBtn">🗡️ Weapon</button>
     ${mpOnline?'<button id="sdLeaveBtn" class="sd-ctrlBtn" onclick="leaveOnlineMatch()">🚪 Leave</button>':''}
   </div>
   <canvas id="sdCanvas" width="1000" height="560"></canvas>
@@ -4461,18 +4462,18 @@ const STAM_LOW = 35;
 const WEAPON_WEIGHT = {fists:1, sword:1.1, spear:1.05, mace:1.25, axe:1.3, hammer:1.4};
 function attackCost(f, kind){
   const a = ATK[kind] || {dmg:10, recovery:.25};
-  const wf = (!f.isAI && PUNCH_FAMILY[kind]) ? WEAPON_WEIGHT[weapon] : 1;
+  const wf = PUNCH_FAMILY[kind] ? WEAPON_WEIGHT[f.weapon] : 1;
   return (a.dmg*0.75 + a.recovery*12) * wf;
 }
 function tiredness(f){ return Math.max(0, 1 - f.stamina/STAM_LOW); }       // 0 fresh … 1 empty
 function atkFor(f, key){
   const base = ATK[key];
   let out = base;
-  if (!(f.isAI || weapon === 'fists' || !PUNCH_FAMILY[key])){
-    const b = WEAPON_BONUS[weapon];
+  if (!(f.weapon === 'fists' || !PUNCH_FAMILY[key])){
+    const b = WEAPON_BONUS[f.weapon];
     let reach = base.reach + b.reachAdd;
     const slot = PUNCH_SLOT[key];
-    if (slot !== undefined) reach = Math.max(reach, WEAPON_HIT[weapon][slot]);
+    if (slot !== undefined) reach = Math.max(reach, WEAPON_HIT[f.weapon][slot]);
     out = Object.assign({}, base, {
       dmg: Math.round(base.dmg * b.dmgMul),
       reach: reach,
@@ -4558,6 +4559,7 @@ class Fighter {
     this.attack = null; this.attackHit = false;
     this.hitT = 0; this.fallA = 0; this.hitZone = 'body'; this.hitSide = 'front';
     this.stamina = 100; this.breathDelay = 0; this.winded = 0; this.cool = 0; this.lastCost = 0; this.atkPower = 1;
+    this.weapon = this.weapon || 'fists';   // keep the equipped weapon across round/match resets
     this.comboQueue = null; this.comboIndex = 0;
     this.launched = false; this.spinA = 0;
   }
@@ -4690,13 +4692,13 @@ class Fighter {
   startSpecial(){
     this.state = 'special'; this.stateTime = 0; this.meter = 0;
     this.vx = 0; this.specialHits = 0; this.hitTick = 0;
-    const wpn = this.isAI ? 'fists' : weapon;
+    const wpn = this.weapon;
     game.flashCol = WEAPONS[wpn].flash;
     sfx('whoosh'); game.flash = .4; game.shake = 12;
   }
 
   updateSpecial(dt, foe){
-    const wpn = this.isAI ? 'fists' : weapon;
+    const wpn = this.weapon;
     if (wpn === 'sword') return this.specSword(dt, foe);
     if (wpn === 'axe') return this.specAxe(dt, foe);
     if (wpn === 'spear') return this.specSpear(dt, foe);
@@ -4836,13 +4838,13 @@ function hitZoneFor(att, def, a){
   if (a.zone) return a.zone;
   if (att.state !== 'attack' || !att.attack) return 'body';
   const key = att.attack;
-  if (!att.isAI && weapon !== 'fists' && PUNCH_SLOT[key] !== undefined){
+  if (att.weapon !== 'fists' && PUNCH_SLOT[key] !== undefined){
     const base = ATK[key], tt = att.stateTime;
     let ext;
     if (tt < base.startup) ext = Math.pow(tt/base.startup, .5)*.4;
     else if (tt < base.startup + base.active) ext = .4 + ((tt-base.startup)/base.active)*.6;
     else ext = 1;
-    const rel = (att.y + weaponTip(weapon, PUNCH_SLOT[key], ext).y) - def.y;
+    const rel = (att.y + weaponTip(att.weapon, PUNCH_SLOT[key], ext).y) - def.y;
     return rel < -138 ? 'head' : (rel > -55 ? 'legs' : 'body');
   }
   let z = ZONE_BY_MOVE[key] || 'body';
@@ -4972,21 +4974,21 @@ function mpSetupNetworking(){
       return;
     }
     if(mpIsHost){
-      if(m.p2Input){try{mpRemoteInput=JSON.parse(m.p2Input);}catch(e){}}
+      if(m.p2Input){try{mpRemoteInput=JSON.parse(m.p2Input); if(mpRemoteInput.weapon)p2.weapon=mpRemoteInput.weapon;}catch(e){}}
     }else{
       if(m.state){
         try{
           const parsed=JSON.parse(m.state);
           mpLatestSnapshot=parsed;
-          if(parsed.myInput)mpRemoteInput=parsed.myInput;   // host's own input, piggy-backed on its state push
+          if(parsed.myInput){mpRemoteInput=parsed.myInput; if(mpRemoteInput.weapon)p1.weapon=mpRemoteInput.weapon;}   // host's own input+weapon, piggy-backed on its state push
         }catch(e){}
       }
     }
   });
   if(mpIsHost){
-    gameIntervalId=setInterval(()=>mpSendState(playerInput()),90);
+    gameIntervalId=setInterval(()=>mpSendState(Object.assign({}, playerInput(), {weapon:p1.weapon})),90);
   }else{
-    gameIntervalId=setInterval(()=>mpSendInput(playerInput()),90);
+    gameIntervalId=setInterval(()=>mpSendInput(Object.assign({}, playerInput(), {weapon:p2.weapon})),90);
   }
 }
 
@@ -5092,10 +5094,10 @@ function pose(f, t){
     else if (tt < a.startup + a.active) ext = 0.4 + ((tt-a.startup)/a.active) * 0.6;
     else ext = Math.max(0, 1 - Math.pow((tt-a.startup-a.active)/a.recovery, 2));
 
-    const weaponSwing = !f.isAI && weapon !== 'fists' && PUNCH_SLOT.hasOwnProperty(f.attack);
+    const weaponSwing = f.weapon !== 'fists' && PUNCH_SLOT.hasOwnProperty(f.attack);
     if (weaponSwing){
       const slot = PUNCH_SLOT[f.attack];
-      if (weapon === 'spear'){
+      if (f.weapon === 'spear'){
         const reach = SPEAR_REACH[slot];
         if (slot === 2){
           // horizontal shaft sweep with the spear held sideways
@@ -5119,7 +5121,7 @@ function pose(f, t){
         }
         handB = {x:-16, y:-118+bob}; elbowB = {x:-8, y:-106+bob};
       } else {
-        const arc = WEAPON_ARCS[weapon][slot], reach = WEAPON_REACH[weapon];
+        const arc = WEAPON_ARCS[f.weapon][slot], reach = WEAPON_REACH[f.weapon];
         const ang = (arc[0] + (arc[1]-arc[0])*ext) * Math.PI/180;
         const lean = Math.cos(ang)*4;
         neck = {x:lean, y:-134+bob}; head = {x:lean+4, y:-156+bob};
@@ -5310,7 +5312,7 @@ function gripWraps(x0, x1, w){
   }
 }
 function drawWeapon(f, P){
-  if (f.isAI || weapon === 'fists') return;
+  if (f.weapon === 'fists') return;
   const hand = P.handF, elbow = P.elbowF;
   let dx = hand.x - elbow.x, dy = hand.y - elbow.y;
   const len = Math.hypot(dx, dy) || 1;
@@ -5321,7 +5323,7 @@ function drawWeapon(f, P){
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.shadowColor = 'rgba(150,200,255,.35)'; ctx.shadowBlur = 7;      // soft rim light against the dark silhouette
 
-  if (weapon === 'sword'){
+  if (f.weapon === 'sword'){
     // grip + pommel
     rod(-13, 3, 5.4, LEATHER); gripWraps(-13, 3, 5.4);
     ctx.fillStyle = vGrad(-4, 4, GOLD); ctx.beginPath(); ctx.arc(-15.5, 0, 3.8, 0, 7); ctx.fill(); inkOutline(1.2);
@@ -5341,7 +5343,7 @@ function drawWeapon(f, P){
     ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = .9;           // edge glint
     ctx.beginPath(); ctx.moveTo(8,-3.3); ctx.lineTo(62,-2.9); ctx.stroke();
 
-  } else if (weapon === 'axe'){
+  } else if (f.weapon === 'axe'){
     // haft with pommel spike
     rod(-12, 50, 5.6, WOOD); gripWraps(-10, 8, 5.6);
     ctx.fillStyle = vGrad(-4, 4, IRON); ctx.beginPath(); ctx.arc(-13, 0, 3.6, 0, 7); ctx.fill(); inkOutline(1.1);
@@ -5363,7 +5365,7 @@ function drawWeapon(f, P){
     ctx.fillStyle = vGrad(-4, 4, GOLD); ctx.beginPath(); ctx.rect(29.5, -4.2, 4.5, 8.4); ctx.fill(); inkOutline(1);
     ctx.beginPath(); ctx.rect(44, -3.4, 3.5, 6.8); ctx.fill(); inkOutline(1);
 
-  } else if (weapon === 'spear'){
+  } else if (f.weapon === 'spear'){
     rod(-34, 64, 4.6, WOOD); gripWraps(-6, 14, 4.6);
     ctx.fillStyle = vGrad(-4, 4, IRON); ctx.beginPath(); ctx.rect(-37, -3.3, 5, 6.6); ctx.fill(); inkOutline(1.1);   // butt cap
     ctx.fillStyle = vGrad(-4.5, 4.5, GOLD); ctx.beginPath(); ctx.rect(58, -4.5, 6, 9); ctx.fill(); inkOutline(1.1);  // socket
@@ -5374,7 +5376,7 @@ function drawWeapon(f, P){
     ctx.strokeStyle = 'rgba(70,86,108,.8)'; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(65,0); ctx.lineTo(86,0); ctx.stroke();
 
-  } else if (weapon === 'hammer'){
+  } else if (f.weapon === 'hammer'){
     rod(-12, 46, 6, WOOD); gripWraps(-10, 10, 6);
     ctx.fillStyle = vGrad(-4, 4, IRON); ctx.beginPath(); ctx.arc(-13.5, 0, 4, 0, 7); ctx.fill(); inkOutline(1.1);
     // head block (chamfered) with steel strike plate
@@ -5387,7 +5389,7 @@ function drawWeapon(f, P){
     ctx.fillStyle = 'rgba(255,255,255,.55)';
     [[41,-9],[41,9],[53,-9],[53,9]].forEach(r => { ctx.beginPath(); ctx.arc(r[0], r[1], 1.3, 0, 7); ctx.fill(); });    // rivets
 
-  } else if (weapon === 'mace'){
+  } else if (f.weapon === 'mace'){
     rod(-12, 40, 5.4, WOOD); gripWraps(-10, 8, 5.4);
     ctx.fillStyle = vGrad(-4, 4, GOLD); ctx.beginPath(); ctx.arc(-13.5, 0, 3.8, 0, 7); ctx.fill(); inkOutline(1.1);
     ctx.fillStyle = vGrad(-6, 6, GOLD); ctx.beginPath(); ctx.rect(36, -5.5, 5, 11); ctx.fill(); inkOutline(1);          // collar
@@ -5582,7 +5584,7 @@ function drawMeter(f, x, y, w, left){
     ctx.fillStyle = '#ffcc00'; ctx.font = 'bold 14px Segoe UI,sans-serif';
     ctx.textAlign = left ? 'left' : 'right';
     ctx.shadowColor = '#ff7700'; ctx.shadowBlur = 5;
-    const label = (!f.isAI ? WEAPONS[weapon].special.toUpperCase() : 'SPECIAL') + ' READY!';
+    const label = WEAPONS[f.weapon].special.toUpperCase() + ' READY!';
     ctx.fillText(label, left ? x : x+w, y+26);
     ctx.shadowBlur = 0;
   }
@@ -5912,6 +5914,7 @@ manualOverlay.addEventListener('click', e => { if (e.target === manualOverlay) m
 /* weapon select modal */
 const weaponOverlay = document.getElementById('sdWeaponOverlay');
 const weaponList = document.getElementById('sdWeaponList');
+function myFighter(){ return (!mpOnline || mpIsHost) ? p1 : p2; }
 const ICON_BOX = {sword:[-19,77,-3], axe:[-16,62,-10], spear:[-37,89,0], hammer:[-18,62,-7], mace:[-18,76,0]};
 function drawWeaponIcon(iconCv, key){
   const ic = iconCv.getContext('2d'), W2 = iconCv.width, H2 = iconCv.height;
@@ -5927,25 +5930,26 @@ function drawWeaponIcon(iconCv, key){
     return;
   }
   const box = ICON_BOX[key], sc = Math.min((W2-14)/(box[1]-box[0]), 1.5*H2/46);
-  const savedCtx = ctx, savedW = weapon;
-  ctx = ic; weapon = key;
+  const savedCtx = ctx;
+  ctx = ic;
   ctx.save();
   ctx.translate(W2/2 - (box[0]+box[1])/2*sc, H2/2 - box[2]*sc);
   ctx.scale(sc, sc);
-  drawWeapon({isAI:false, x:0}, {handF:{x:0,y:0}, elbowF:{x:-40,y:0}});
+  drawWeapon({weapon:key, x:0}, {handF:{x:0,y:0}, elbowF:{x:-40,y:0}});
   ctx.restore();
-  ctx = savedCtx; weapon = savedW;
+  ctx = savedCtx;
 }
 function weaponStats(key){
-  if (key === 'fists') return {dmg:1.0, reach:100};
-  return {dmg:WEAPON_BONUS[key].dmgMul, reach:Math.max.apply(null, WEAPON_HIT[key])};
+  if (key === 'fists') return {dmg:1.0, reach:100, weight:WEAPON_WEIGHT.fists};
+  return {dmg:WEAPON_BONUS[key].dmgMul, reach:Math.max.apply(null, WEAPON_HIT[key]), weight:WEAPON_WEIGHT[key]};
 }
 function renderWeaponList(){
   weaponList.innerHTML = '';
+  const mine = myFighter().weapon;
   Object.keys(WEAPONS).forEach(key => {
     const w = WEAPONS[key], st = weaponStats(key);
     const row = document.createElement('div');
-    row.className = 'sd-wpnRow' + (weapon === key ? ' sel' : '');
+    row.className = 'sd-wpnRow' + (mine === key ? ' sel' : '');
     row.innerHTML =
       '<canvas class="sd-wpnIcon" width="192" height="92"></canvas>' +
       '<div class="sd-wpnInfo">' +
@@ -5953,10 +5957,11 @@ function renderWeaponList(){
         '<div class="sd-ws">Special: '+w.special+'</div>' +
         '<div class="sd-stat">POWER <i><b style="width:'+Math.round(Math.min(1, st.dmg/1.7)*100)+'%;background:#ff6b5e"></b></i>' +
                             'RANGE <i><b style="width:'+Math.round(Math.min(1, st.reach/230)*100)+'%;background:#5ec8ff"></b></i></div>' +
+        '<div class="sd-stat">WEIGHT <i><b style="width:'+Math.round(Math.min(1, (st.weight-1)/0.45)*100)+'%;background:#ffb35c"></b></i><span class="sd-stat-note">'+(st.weight>1?'tires you faster':'lightest')+'</span></div>' +
       '</div>' +
       '<div class="sd-tick">✓</div>';
     drawWeaponIcon(row.querySelector('canvas'), key);
-    row.addEventListener('click', () => { weapon = key; renderWeaponList(); });
+    row.addEventListener('click', () => { myFighter().weapon = key; renderWeaponList(); });
     weaponList.appendChild(row);
   });
 }
