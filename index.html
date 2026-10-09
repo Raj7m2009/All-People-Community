@@ -4704,7 +4704,7 @@ function doKO(f){
 }
 
 /* ---------- game state ---------- */
-const game = {state:'menu', round:1, timer:60, t:0, msg:'', msgT:0, msgCol:'#fff',
+const game = {state:'menu', round:1, timer:0, t:0, msg:'', msgT:0, msgCol:'#fff',
              shake:0, hitstop:0, timescale:1, slowT:0, endT:0, introT:0, pendingWinner:null, flash:0,
              flashCol:'200,100,255'};
 const p1 = new Fighter(300,  1, false);
@@ -4802,7 +4802,7 @@ function setMsg(m, t, col){ game.msg = m; game.msgT = t; game.msgCol = col || '#
 function resetFight(){
   p1.reset(300, 1); p2.reset(700, -1);
   parts.length = 0;
-  game.timer = 60; game.timescale = 1; game.slowT = 0; game.hitstop = 0; game.shake = 0;
+  game.timer = 0; game.timescale = 1; game.slowT = 0; game.hitstop = 0; game.shake = 0;
 }
 function startMatch(){
   p1.rounds = 0; p2.rounds = 0; game.round = 1;
@@ -5422,7 +5422,7 @@ function drawHUD(){
   
   ctx.fillStyle = '#fff'; ctx.font = '900 42px Segoe UI,sans-serif'; ctx.textAlign = 'center';
   ctx.shadowColor = 'rgba(0,0,0,.8)'; ctx.shadowBlur = 10;
-  ctx.fillText(String(Math.ceil(Math.max(0, game.timer))).padStart(2,'0'), W/2, 55);
+  ctx.fillText('∞', W/2, 55);
   ctx.shadowBlur = 0;
 
   if (game.msgT > 0 && game.state !== 'matchEnd'){
@@ -5560,9 +5560,9 @@ function loop(now){
       game.introT -= dt;
       if (game.introT <= 0){ game.state = 'fight'; setMsg('FIGHT!', .9, '#00ff66'); }
     } else if (game.state === 'fight'){
-      game.timer -= eff;
-      if (game.timer <= 0){ game.timer = 0; timeUp(); }
-    } else if (game.state === 'roundEnd'){
+      // Unlimited round: no countdown and no time-up interruption.
+      game.timer = 0;
+    } else if (game.state === 'roundEnd'){ 
       game.endT -= dt;
       if (game.endT <= 0) nextRound();
     }
@@ -5807,11 +5807,28 @@ function startBodyClash(mpMatchId,mpRole){
 #bcStage{position:relative;}
 #bcCanvas{width:100%;display:block;border-radius:12px;touch-action:none;background:#14101f;}
 #bcElemBox{position:absolute;top:10%;right:6px;display:flex;flex-direction:row-reverse;align-items:center;gap:6px;}
+#bcChargeBars{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);z-index:6;width:clamp(150px,34%,220px);display:flex;flex-direction:column;gap:2px;pointer-events:none;font:700 7px/1 Arial,sans-serif;}
+/* Tiny swipe-special meters live in the black control area between the joysticks,
+   never over the fighting arena. Existing joystick layout and behavior are untouched. */
+#bcGestureBars{display:none;}
+.bcGestureRow{height:11px;box-sizing:border-box;display:grid;grid-template-columns:39px 1fr 20px;align-items:center;gap:2px;padding:1px 2px;border:1px solid rgba(255,255,255,.10);border-radius:3px;background:rgba(5,8,18,.9);color:#f2f5ff;text-shadow:0 1px 2px #000;}
+.bcGestureName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bcGestureTrack{height:4px;border-radius:4px;background:rgba(255,255,255,.13);overflow:hidden;border:1px solid rgba(255,255,255,.10);}
+.bcGestureFill{height:100%;width:100%;border-radius:5px;background:var(--gesture-color);box-shadow:0 0 5px var(--gesture-color);transition:width .12s linear;}
+.bcGestureState{text-align:right;color:#eaf0ff;font-variant-numeric:tabular-nums;font-size:6px;}
+.bcGestureRow.ready{border-color:var(--gesture-color);box-shadow:0 0 6px color-mix(in srgb,var(--gesture-color) 45%,transparent);}
+.bcChargeRow{height:12px;box-sizing:border-box;display:grid;grid-template-columns:53px 1fr 20px;align-items:center;gap:3px;padding:1px 3px;border:1px solid rgba(255,255,255,.12);border-radius:4px;background:rgba(5,8,18,.78);color:#f2f5ff;text-shadow:0 1px 2px #000;}
+.bcChargeName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bcChargeTrack{height:5px;border-radius:5px;background:rgba(255,255,255,.13);overflow:hidden;border:1px solid rgba(255,255,255,.12);}
+.bcChargeFill{height:100%;width:0%;border-radius:5px;background:var(--charge-color);box-shadow:0 0 5px var(--charge-color);transition:width .12s linear;}
+.bcChargePct{text-align:right;color:#eaf0ff;font-variant-numeric:tabular-nums;}
+.bcChargeRow.ready{border-color:var(--charge-color);box-shadow:0 0 8px color-mix(in srgb,var(--charge-color) 55%,transparent);}
+.bcChargeRow.ready .bcChargeFill{filter:brightness(1.35);}
 .bcEBtn{width:38px;height:38px;border-radius:50%;border:2px solid var(--c,rgba(255,255,255,.35));background:rgba(10,8,20,.72);color:#fff;font-size:20px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;}
 .bcEBtn.sel{box-shadow:0 0 12px 2px var(--c,#fff);}
 #bcElemTray{display:none;flex-direction:row-reverse;gap:6px;}
 #bcElemTray.open{display:flex;}
-#bcPanel{position:relative;height:252px;margin-top:6px;touch-action:none;}
+#bcPanel{position:relative;position:relative;height:252px;margin-top:6px;touch-action:none;}
 .bcSW{position:absolute;width:118px;text-align:center;}
 .bcBase{width:104px;height:104px;margin:0 auto;border-radius:50%;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.22);position:relative;touch-action:none;}
 .bcKnob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.6);pointer-events:none;box-shadow:0 3px 10px rgba(0,0,0,.45);}
@@ -5824,13 +5841,30 @@ function startBodyClash(mpMatchId,mpRole){
   ${online?'<button onclick="leaveOnlineMatch()" style="margin:0 0 6px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(20,15,35,.8);color:#e8e8f0;font:bold 12px sans-serif;cursor:pointer;">🚪 Leave</button>':''}
   <div id="bcStage">
     <canvas id="bcCanvas" width="960" height="540"></canvas>
+
     <div id="bcElemBox"><button class="bcEBtn" id="bcElemMain" title="Element"></button><div id="bcElemTray"></div></div>
   </div>
   <div id="bcPanel">
-    <div class="bcSW" style="left:4px;top:0"><div class="bcBase" id="bcSFly"><div class="bcKnob"></div></div><div class="bcLbl">✈ MOVE · FLY</div></div>
-    <div class="bcSW" style="left:4px;top:130px"><div class="bcBase" id="bcSAtk"><div class="bcKnob"></div></div><div class="bcLbl">🤜 R-HAND · ATTACK</div></div>
-    <div class="bcSW" style="right:4px;top:130px"><div class="bcBase" id="bcSSh"><div class="bcKnob"></div></div><div class="bcLbl">🛡 L-HAND · SHIELD</div></div>
-    <div id="bcHint"><b>Move/Fly:</b> walk, push up to fly, pull down to land.<br><b>Attack:</b> hold to aim, <b>release</b> to cast — reach farther = more power.<br><b>Shield:</b> push toward the threat — farther = bigger &amp; stronger dome.<br><b>Corner icon:</b> choose element.<br><b>Hold attack ~2s then release:</b> SUPER move (Earth = Titan giant).<br><b>Touch the arena:</b> ground→up = Earth pillars · sky→down = Lightning · circle = Tornado · swipe from yourself = Flames · touch rival = Freeze. (Keys: WASD · J attack · K shield · 1-5 element)</div>
+    <div id="bcChargeBars" aria-label="Element special power charge">
+      <div class="bcChargeRow" data-charge="lightning" style="--charge-color:#ffe94d"><span class="bcChargeName">⚡ LIGHTNING</span><div class="bcChargeTrack"><div class="bcChargeFill" id="bcCharge-lightning"></div></div><span class="bcChargePct" id="bcPct-lightning">0%</span></div>
+      <div class="bcChargeRow" data-charge="ice" style="--charge-color:#7fdcff"><span class="bcChargeName">❄ ICE</span><div class="bcChargeTrack"><div class="bcChargeFill" id="bcCharge-ice"></div></div><span class="bcChargePct" id="bcPct-ice">0%</span></div>
+      <div class="bcChargeRow" data-charge="fire" style="--charge-color:#ff7a2e"><span class="bcChargeName">🔥 FIRE</span><div class="bcChargeTrack"><div class="bcChargeFill" id="bcCharge-fire"></div></div><span class="bcChargePct" id="bcPct-fire">0%</span></div>
+      <div class="bcChargeRow" data-charge="wind" style="--charge-color:#a8ffd0"><span class="bcChargeName">🌪 WIND</span><div class="bcChargeTrack"><div class="bcChargeFill" id="bcCharge-wind"></div></div><span class="bcChargePct" id="bcPct-wind">0%</span></div>
+      <div class="bcChargeRow" data-charge="earth" style="--charge-color:#c8925a"><span class="bcChargeName">🪨 EARTH</span><div class="bcChargeTrack"><div class="bcChargeFill" id="bcCharge-earth"></div></div><span class="bcChargePct" id="bcPct-earth">0%</span></div>
+    </div>
+    <div id="bcGestureBars" aria-label="Touch gesture action cooldowns">
+      <div class="bcGestureRow" data-gesture="earth" style="--gesture-color:#c8925a"><span class="bcGestureName">🪨 EARTH ROOT</span><div class="bcGestureTrack"><div class="bcGestureFill" id="bcGesture-earth"></div></div><span class="bcGestureState" id="bcGestureState-earth">READY</span></div>
+      <div class="bcGestureRow" data-gesture="ltn" style="--gesture-color:#ffe94d"><span class="bcGestureName">⚡ LIGHTNING</span><div class="bcGestureTrack"><div class="bcGestureFill" id="bcGesture-ltn"></div></div><span class="bcGestureState" id="bcGestureState-ltn">READY</span></div>
+      <div class="bcGestureRow" data-gesture="tor" style="--gesture-color:#a8ffd0"><span class="bcGestureName">🌪 TORNADO</span><div class="bcGestureTrack"><div class="bcGestureFill" id="bcGesture-tor"></div></div><span class="bcGestureState" id="bcGestureState-tor">READY</span></div>
+      <div class="bcGestureRow" data-gesture="flame" style="--gesture-color:#ff7a2e"><span class="bcGestureName">🔥 FLAMES</span><div class="bcGestureTrack"><div class="bcGestureFill" id="bcGesture-flame"></div></div><span class="bcGestureState" id="bcGestureState-flame">READY</span></div>
+      <div class="bcGestureRow" data-gesture="ice" style="--gesture-color:#7fdcff"><span class="bcGestureName">❄ FREEZE</span><div class="bcGestureTrack"><div class="bcGestureFill" id="bcGesture-ice"></div></div><span class="bcGestureState" id="bcGestureState-ice">READY</span></div>
+    </div>
+
+    <div class="bcSW" style="left:4px;top:30px"><div class="bcBase" id="bcSFly"><div class="bcKnob"></div></div><div class="bcLbl">✈ MOVE · FLY (L)</div></div>
+    <div class="bcSW" style="right:4px;top:30px"><div class="bcBase" id="bcSFlyR"><div class="bcKnob"></div></div><div class="bcLbl">✈ MOVE · FLY (R)</div></div>
+    <div class="bcSW" style="left:4px;top:160px"><div class="bcBase" id="bcSAtk"><div class="bcKnob"></div></div><div class="bcLbl">🤜 R-HAND · ATTACK</div></div>
+    <div class="bcSW" style="right:4px;top:160px"><div class="bcBase" id="bcSSh"><div class="bcKnob"></div></div><div class="bcLbl">🛡 L-HAND · SHIELD</div></div>
+    <div id="bcHint"><b>Move/Fly:</b> either top stick works; push up to fly, pull down to land.<br><b>Attack:</b> hold to aim, <b>release</b> to cast — reach farther = more power.<br><b>Shield:</b> push toward the threat — farther = bigger &amp; stronger dome.<br><b>Corner icon:</b> choose element.<br><b>Element bars:</b> each normal attack charges its own element. At full charge, hold attack and release to use that element's SUPER; only that element bar empties. No cooldown; all powers use Stamina.<br><b>Element matchups:</b> Fire beats Ice · Ice beats Earth · Earth grounds Lightning · Lightning beats Wind · Wind beats Fire. Stone: Fire cannot break it, Ice chips it lightly, Earth hits it hardest; Lightning is grounded by stone.<br><b>Touch the arena:</b> ground→up = draw your own curved Earth root (higher = thicker base + more energy) · sky→down = Lightning · circle = Tornado · swipe from yourself = Flames · touch rival = Freeze. (Keys: WASD · J attack · K shield · 1-5 element)</div>
   </div>
 </div>`;
 
@@ -5849,6 +5883,22 @@ function startBodyClash(mpMatchId,mpRole){
     wind:     {icon:'🌪️',name:'WIND',     col:'#a8ffd0',col2:'#eafff4',dmg:7, spd:14,r:14,kb:11,stun:20,sm:0.7},
     earth:    {icon:'🪨',name:'EARTH',    col:'#c8925a',col2:'#6b4a2a',dmg:19,spd:9, r:15,kb:8, stun:26,sm:1.8}
   };
+  // Different thresholds keep each element's signature super balanced. All meters start empty.
+  const CHARGE_MAX={lightning:100,ice:92,fire:112,wind:84,earth:124};
+  const CHARGE_GAIN={lightning:1.00,ice:1.10,fire:0.92,wind:1.18,earth:0.86};
+  function addSpecialCharge(f,el,power){
+    if(!f.spCharge)f.spCharge={fire:0,ice:0,lightning:0,wind:0,earth:0};
+    const max=CHARGE_MAX[el]||100,was=f.spCharge[el]||0;
+    const base=7+Math.max(0,Math.min(1,power))*8;
+    f.spCharge[el]=Math.min(max,was+base*(CHARGE_GAIN[el]||1));
+    if(was<max&&f.spCharge[el]>=max){floatText(f.x,f.y-165*SC,EL[el].icon+' '+EL[el].name+' SUPER READY!',EL[el].col,14);P(f.x,f.y-80*SC,0,0,18,12,EL[el].col,{kind:'ring',grow:4,add:true});}
+  }
+  function chargeFull(f,el=f.el){return !!(f.spCharge&&f.spCharge[el]>=CHARGE_MAX[el]);}
+  function powerBReady(el, x=p1.x, y=p1.y){
+    if(chargeFull(p1,el))return true;
+    if(G.noEn<=0){floatText(x,y-145*SC,'FILL '+EL[el].name+' BAR FIRST',EL[el].col,12);G.noEn=24;}
+    return false;
+  }
 
   /* ---------- world state ---------- */
   const parts=[], texts=[], projs=[];
@@ -5863,8 +5913,8 @@ function startBodyClash(mpMatchId,mpRole){
   function makeFighter(id,x,color){
     const f={id,color,x,y:GROUND_Y,vx:0,vy:0,face:x<W/2?1:-1,onGround:true,lean:0,walkPh:0,t:Math.floor(rand(0,100)),
       hp:100,ghost:100,ghostT:0,en:160,enMax:160,ice:false,iceK:1,iceStage:0,iceT:0,crack:0,sc:1,titan:0,remote:false,
-      stun:0,freeze:0,slow:0,burn:0,burnPow:1,shock:0,dizzy:0,flash:0,flashCol:'#fff',
-      ko:false,koDir:1,fallAng:0,fallV:0,el:'fire',
+      stun:0,freeze:0,slow:0,burn:0,burnPow:1,shock:0,dizzy:0,tornadoed:0,flash:0,flashCol:'#fff',
+      ko:false,koDir:1,fallAng:0,fallV:0,el:'fire',superCd:0,spCharge:{fire:0,ice:0,lightning:0,wind:0,earth:0},
       atk:{on:false,ang:0,ext:0,peak:0,t:0,cd:0,kick:0},
       sh:{on:false,ang:0,ext:0,form:0,R:30,lock:0,hit:0,hitAng:0},
       hR:{x:x,y:0},hL:{x:x,y:0},ai:null};
@@ -5873,6 +5923,27 @@ function startBodyClash(mpMatchId,mpRole){
   }
   let p1=makeFighter(1,(online&&!isHost)?720:240,'#00e5a0'), p2=makeFighter(2,(online&&!isHost)?240:720,'#ff3b5c');
   if(online)p2.remote=true;
+  function updateChargeBars(){
+    if(!p1||!p1.spCharge)return;
+    for(const k of ORDER){
+      const max=CHARGE_MAX[k]||100,val=Math.max(0,Math.min(max,p1.spCharge[k]||0)),pct=Math.round(val/max*100);
+      const fill=document.getElementById('bcCharge-'+k),label=document.getElementById('bcPct-'+k),row=document.querySelector('.bcChargeRow[data-charge="'+k+'"]');
+      if(fill)fill.style.width=pct+'%';if(label)label.textContent=pct+'%';if(row){row.classList.toggle('ready',val>=max);row.title=val>=max?EL[k].name+' SUPER READY — hold attack and release':'Charge '+Math.round(val)+' / '+max+'; fill by attacking with '+EL[k].name;}
+    }
+  }
+  updateChargeBars();
+  const GESTURE_CD_MAX={earth:360,ltn:150,tor:240,flame:300,ice:360};
+  function updateGestureBars(){
+    if(typeof cd==='undefined')return;
+    for(const k of Object.keys(GESTURE_CD_MAX)){
+      const max=GESTURE_CD_MAX[k],left=Math.max(0,Math.min(max,cd[k]||0));
+      const pct=Math.round((1-left/max)*100);
+      const fill=document.getElementById('bcGesture-'+k),state=document.getElementById('bcGestureState-'+k),row=document.querySelector('.bcGestureRow[data-gesture="'+k+'"]');
+      if(fill)fill.style.width=pct+'%';
+      if(state)state.textContent=left>0?(left/60).toFixed(1)+'s':'READY';
+      if(row){row.classList.toggle('ready',left<=0);row.title=left>0?'Gesture cooldown: '+(left/60).toFixed(1)+' seconds':'Gesture ready';}
+    }
+  }
 
   /* ---------- particles / floating text ---------- */
   function P(x,y,vx,vy,life,size,col,o){
@@ -5913,15 +5984,30 @@ function startBodyClash(mpMatchId,mpRole){
   }
   function applyDamage(f,amt,big){
     if(f.ko)return;
-    if(f.titan>0)amt*=0.45;
+    if(f.titan>0)amt*=0.32;
     f.hp=Math.max(0,f.hp-amt);f.ghostT=34;
     if(f===p1)vig=Math.max(vig,big?0.55:0.12);
     if(f.hp<=0)koFighter(f);
   }
+  // Element-vs-element balance: each element has one counter and one weakness.
+  // Fire > Ice > Earth > Lightning > Wind > Fire.
+  function elementMatchup(attack,defend){
+    const beats={fire:'ice',ice:'earth',earth:'lightning',lightning:'wind',wind:'fire'};
+    if(beats[attack]===defend)return 1.25;
+    if(beats[defend]===attack)return 0.82;
+    return 1;
+  }
   function hurt(f,p){
-    if(f.ice)breakIce(f,10);
+    if(f.ice){if(p.el==='fire')breakIce(f,16);else breakIce(f,10);}
+    if(p.el==='fire'&&f.iceStage>0&&!f.ice){clearIce(f);f.freeze=0;floatText(f.x,f.y-145*SC,'ICE MELTED!','#ffb347',13);}
     const E=EL[p.el],head=p.y<f.y-108*SC*(f.sc||1);
-    let dmg=E.dmg*(0.55+0.9*p.pw)*(head?1.3:1);dmg=Math.round(dmg*10)/10;
+    let dmg=E.dmg*(0.55+0.9*p.pw)*(head?1.3:1)*elementMatchup(p.el,f.el);
+    if(f.titan>0){
+      // Titan's earthen armour is especially strong against fire/ice, but not invulnerable.
+      const titanRes={fire:0.72,ice:0.62,lightning:0.9,wind:0.82,earth:0.7};
+      dmg*=titanRes[p.el]||0.8;
+    }
+    dmg=Math.round(dmg*10)/10;
     const dir=p.vx>=0?1:-1;
     f.flash=12;f.flashCol=E.col;
     f.stun=Math.max(f.stun,Math.round(E.stun*(0.7+0.5*p.pw)));
@@ -5957,11 +6043,13 @@ function startBodyClash(mpMatchId,mpRole){
     const cost=9+20*power;
     if(f.en<cost){floatText(f.x,f.y-150*SC,'NO ENERGY','#8892a4',12);burst(f.hR.x,f.hR.y,'#8892a4',5,2,14,2);return false;}
     f.en-=cost;f.atk.cd=22;f.atk.kick=1;
+    if(f.tornadoed>0){ang+=rand(-0.32,0.32);power*=0.78;}
     const E=EL[f.el],spd=E.spd*(0.85+0.3*power),hh=sp(f,f.hR),x=hh.x+Math.cos(ang)*8,y=hh.y+Math.sin(ang)*8;
     const shape=[];for(let i=0;i<8;i++)shape.push(rand(0.8,1.15));
     const pj={o:f,el:f.el,x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,r:E.r*(0.8+0.6*power)*0.85,pw:power,ang,rot:rand(0,6),life:220,tr:[],shape,dead:false};
     if(f.titan>0){pj.el='earth';pj.r=34;pj.pw=1.3;pj.vx=Math.cos(ang)*14;pj.vy=Math.sin(ang)*14;pj.life=20;pj.fist=true;}
     projs.push(pj);
+    addSpecialCharge(f,f.el,power); // only the element used for this attack gains charge
     if(online&&f===p1)emit('c',pjData(pj));
     burst(x,y,E.col,8,3.5,16,3,{add:true});
     P(x,y,0,0,12,5,E.col2,{kind:'ring',grow:2.6,add:true});
@@ -5973,7 +6061,7 @@ function startBodyClash(mpMatchId,mpRole){
   function updateFighter(f,inp,opp){
     if(f.remote){updateRemote(f);return;}
     f.t++;
-    if(f.stun>0)f.stun--; if(f.freeze>0)f.freeze--; if(f.slow>0)f.slow--; if(f.shock>0)f.shock--; if(f.dizzy>0)f.dizzy--; if(f.flash>0)f.flash--;
+    if(f.stun>0)f.stun--; if(f.freeze>0)f.freeze--; if(f.slow>0)f.slow--; if(f.shock>0)f.shock--; if(f.dizzy>0)f.dizzy--; if(f.tornadoed>0)f.tornadoed--; if(f.flash>0)f.flash--;
     if(f.atk.cd>0)f.atk.cd--; f.atk.kick*=0.85; if(f.sh.lock>0)f.sh.lock--; if(f.sh.hit>0)f.sh.hit-=0.06;
     if(f.burn>0&&!f.ko){
       f.burn--;
@@ -5992,7 +6080,13 @@ function startBodyClash(mpMatchId,mpRole){
     if(canAct&&ia.held&&ia.ext>=0.2){
       A.on=true;A.ang=ia.ang;A.ext+=(ia.ext-A.ext)*0.5;A.peak=Math.max(A.peak*0.985,ia.ext);A.t++;
     } else {
-      if(A.on&&canAct&&!ia.held&&A.t>=2&&A.peak>=0.25){if(!(A.t>=SUPER_T&&castSuper(f,ia.ang)))castElement(f,ia.ang,A.peak);}
+      if(A.on&&canAct&&!ia.held&&A.t>=2&&A.peak>=0.25){
+        if(A.t>=SUPER_T){
+          /* POWER A: joystick hold/release keeps its original direct-super behavior.
+             It is controlled by Stamina, not by Power B's elemental charge bars. */
+          if(!castSuper(f,ia.ang))castElement(f,ia.ang,A.peak);
+        } else castElement(f,ia.ang,A.peak);
+      }
       A.on=false;A.peak=0;A.t=0;A.ext*=0.7;
     }
     /* left hand: dome shield */
@@ -6057,6 +6151,15 @@ function startBodyClash(mpMatchId,mpRole){
     f.hL.x+=(tL.x-f.hL.x)*0.4;f.hL.y+=(tL.y-f.hL.y)*0.4;
   }
 
+  /* Elemental rock matchups: stone is a physical material, not a generic target. */
+  function rockDamage(el,base){
+    const mult={fire:0,ice:0.18,lightning:0.72,wind:0.55,earth:1.65};
+    return base*(mult[el]??1);
+  }
+  function groundedAt(x){
+    return rocks.some(R=>R.hp>0&&R.y>GROUND_Y-65&&Math.abs(R.x-x)<R.r+18);
+  }
+
   /* ---------- projectiles ---------- */
   function blockHit(t,p,dx,dy){
     const E=EL[p.el],raw=E.dmg*(0.55+0.9*p.pw);
@@ -6099,8 +6202,28 @@ function startBodyClash(mpMatchId,mpRole){
         const C=shieldC(tgt),dx=p.x-C.x,dy=p.y-C.y,d=Math.hypot(dx,dy);
         if(d<tgt.sh.R+p.r&&(dx*Math.cos(tgt.sh.ang)+dy*Math.sin(tgt.sh.ang))>-p.r*0.5){blockHit(tgt,p,dx,dy);dead=true;}
       }
-      /* stone pillars */
-      if(!dead){for(const R of rocks){if(R.hp<=0)continue;if(Math.hypot(p.x-R.x,p.y-R.y)<R.r+p.r){R.hp-=EL[p.el].dmg*(0.55+0.9*p.pw)*1.1+4;impactFx(p.x,p.y,'earth',0.5);shake=Math.max(shake,2);if(p.pierce)R.hp=0;else dead=true;break;}}}
+      /* Earth walls stop every projectile, including piercing wind/super shots. */
+      if(!dead){for(const R of rocks){if(R.hp<=0)continue;const wallPad=R.wall?5:0;if(Math.hypot(p.x-R.x,p.y-R.y)<R.r+p.r+wallPad){
+        if(R.wall){
+          let rd=0;
+          if(p.el==='ice')rd=2.5;
+          else if(p.el==='lightning')rd=4.5;
+          else if(p.el==='earth')rd=7;
+          else if(p.el==='wind')rd=3;
+          else if(p.el==='fire')rd=0; // fire cannot destroy stone
+          if(R.ice){rd=p.el==='fire'?7:(p.el==='lightning'?9:5);}
+          if(rd>0){R.hp-=rd;impactFx(p.x,p.y,R.ice?'ice':'earth',0.5);shake=Math.max(shake,1.5);}
+          if(p.el==='lightning')P(R.x,R.y,rand(-1,1),rand(-1,1),12,3,'#ffe94d',{kind:'spark',add:true});
+          dead=true;break;
+        }
+        const base=EL[p.el].dmg*(0.55+0.9*p.pw)*1.1+4,rd=rockDamage(p.el,base);
+        if(rd>0){R.hp-=rd;impactFx(p.x,p.y,'earth',0.5);shake=Math.max(shake,2);}
+        if(p.el==='fire'){P(p.x,p.y,rand(-1,1),rand(-1,1),10,2,'#ff9a3c',{add:true});}
+        else if(p.el==='lightning'){P(R.x,R.y,rand(-1,1),rand(-1,1),12,3,'#ffe94d',{kind:'spark',add:true});}
+        if(p.pierce&&p.el!=='fire')R.hp=0;
+        if(p.el!=='wind'&&p.el!=='fire')dead=true;else if(p.el==='wind')p.pw*=0.82;
+        break;
+      }}}
       /* body */
       if(!dead&&!tgt.ko){
         const ts=tgt.sc||1;if(p.x>tgt.x-(22*SC+5)*ts-p.r*0.5&&p.x<tgt.x+(22*SC+5)*ts+p.r*0.5&&p.y>tgt.y-132*SC*ts-p.r*0.5&&p.y<tgt.y+p.r*0.5){if(tgt.remote){if(!p.pierce){impactFx(p.x,p.y,p.el,p.pw);dead=true;}}else if(p.pierce){if(!p.did){p.did=true;hurt(tgt,p);}}else{hurt(tgt,p);dead=true;}}
@@ -6151,6 +6274,7 @@ function startBodyClash(mpMatchId,mpRole){
     return st;
   }
   const sFly=makeStick(document.getElementById('bcSFly'));
+  const sFlyR=makeStick(document.getElementById('bcSFlyR'));
   const sAtk=makeStick(document.getElementById('bcSAtk'));
   const sSh=makeStick(document.getElementById('bcSSh'));
   cvs.addEventListener('pointerdown',()=>{if(gstate==='menu'||gstate==='matchEnd')startMatch();});
@@ -6169,7 +6293,8 @@ function startBodyClash(mpMatchId,mpRole){
 
   function aimAtOpp(f,o){return Math.atan2((o.y-70*SC)-(f.y-90*SC),o.x-f.x);}
   function playerInput(){
-    let mx=sFly.x,my=sFly.y;
+    // Either movement stick can control the fighter. If both are used, combine their directions.
+    let mx=sFly.x+sFlyR.x,my=sFly.y+sFlyR.y;
     if(keys.l)mx-=1;if(keys.r)mx+=1;if(keys.u)my-=1;if(keys.d)my+=1;
     mx=clamp(mx,-1,1);my=clamp(my,-1,1);
     const inp={mx,my,atk:{held:false,ang:sAtk.ang,ext:0},sh:{held:false,ang:sSh.ang,ext:0}};
@@ -6184,7 +6309,7 @@ function startBodyClash(mpMatchId,mpRole){
 
   /* ---------- AI rival ---------- */
   function aiInput(f,o){
-    const ai=f.ai||(f.ai={mt:0,wantDist:340,wantY:GROUND_Y,mx:0,my:0,charge:0,chargeMax:1,chargeExt:0.8,chargeErr:0,cd:70,shT:0,shAng:0,shExt:0.8,dodge:0,dodgeDir:1,seen:null});
+    const ai=f.ai||(f.ai={mt:0,wantDist:340,wantY:GROUND_Y,mx:0,my:0,charge:0,chargeMax:1,chargeExt:0.8,chargeErr:0,cd:45,shT:0,shAng:0,shExt:0.8,dodge:0,dodgeDir:1,seen:null,elementIndex:0,specialCd:100+Math.random()*60,specialIndex:0});
     const lvl=Math.min(0.9,0.25+round*0.2);
     const inp=NEUTRAL();
     if(--ai.mt<=0){ai.mt=rand(50,110);ai.wantDist=rand(240,430);ai.wantY=Math.random()<0.45?GROUND_Y:rand(CEIL_Y+20,GROUND_Y-40);}
@@ -6204,8 +6329,8 @@ function startBodyClash(mpMatchId,mpRole){
     }
     if(threat&&ai.seen!==threat){
       ai.seen=threat;
-      if(Math.random()<lvl){
-        if(Math.random()<0.65&&f.en>15){ai.shT=26;ai.shAng=Math.atan2(threat.y-(f.y-80*SC),threat.x-f.x);ai.shExt=rand(0.7,1);ai.charge=0;}
+      if(Math.random()<Math.min(0.98,lvl+0.18)){
+        if(Math.random()<0.72&&f.en>12){ai.shT=26;ai.shAng=Math.atan2(threat.y-(f.y-80*SC),threat.x-f.x);ai.shExt=rand(0.7,1);ai.charge=0;}
         else{ai.dodge=22;ai.dodgeDir=threat.y>f.y-65*SC?-1:1;}
       }
     }
@@ -6220,11 +6345,42 @@ function startBodyClash(mpMatchId,mpRole){
       ai.lastAng=Math.atan2(ty-hy,tx-hx)+ai.chargeErr;
       inp.atk={held:true,ang:ai.lastAng,ext:ai.chargeExt};
       if(ai.charge===0)ai.cd=Math.round(rand(40,90)/(0.7+lvl*0.6));
-    } else if(ai.shT<=0&&ai.cd<=0&&f.en>28&&f.stun<=0&&f.atk.cd<=0&&Math.random()<0.05+0.03*round){
-      f.el=ORDER[Math.floor(Math.random()*ORDER.length)];
-      ai.chargeMax=ai.charge=Math.round(rand(14,34));ai.chargeExt=rand(0.55,1);ai.chargeErr=rand(-1,1)*(1-lvl)*0.25;
+    } else if(ai.shT<=0&&ai.cd<=0&&f.en>28&&f.stun<=0&&f.atk.cd<=0&&Math.random()<Math.min(0.22,0.09+0.025*round)){
+      // Prefer a charged element occasionally; otherwise rotate through all elements.
+      const readyEl=ORDER.find(k=>chargeFull(f,k));
+      if(readyEl&&f.superCd<=0&&Math.random()<0.62){f.el=readyEl;ai.chargeMax=ai.charge=Math.round(SUPER_T+rand(4,14));}
+      else{ai.elementIndex=(ai.elementIndex||0)%ORDER.length;f.el=ORDER[ai.elementIndex];ai.elementIndex=(ai.elementIndex+1)%ORDER.length;ai.chargeMax=ai.charge=Math.round(rand(14,34));}
+      ai.chargeExt=rand(0.55,1);ai.chargeErr=rand(-1,1)*(1-lvl)*0.25;
     }
     if(!inp.atk.held)inp.atk.ang=ai.lastAng||0;
+
+    // Offline rival Power B: same elemental charge rules as the player.
+    // No hidden special cooldowns: only matching charge + shared Stamina can authorize a move.
+    if(f===p2&&!online&&gstate==='fight'){
+      if(f.en>=24&&f.stun<=0&&f.freeze<=0&&!f.ko){
+        const choices=[];
+        if(chargeFull(f,'lightning')&&f.en>=26)choices.push('lightning');
+        if(chargeFull(f,'ice')&&!o.ice&&o.iceStage<=0&&f.en>=28)choices.push('freeze');
+        if(chargeFull(f,'wind')&&tors.length<2&&f.en>=30)choices.push('tornado');
+        if(chargeFull(f,'fire')&&f.en>=24)choices.push('flame');
+        if(chargeFull(f,'earth')&&f.en>=24)choices.push('earth');
+        if(choices.length){
+          const move=choices[ai.specialIndex%choices.length];ai.specialIndex++;
+          if(move==='lightning'){
+            f.spCharge.lightning=0;f.en-=26;const x=clamp(o.x+o.vx*8,35,W-35);pendingBolts.push({x,t:48,target:o,remote:false});floatText(x,GROUND_Y-45,'LIGHTNING INCOMING!','#ffe94d',14);
+          }else if(move==='freeze'){
+            f.spCharge.ice=0;f.en-=28;startFreeze(o);
+          }else if(move==='tornado'){
+            f.spCharge.wind=0;f.en-=30;const t={x:clamp(o.x,40,W-40),y:clamp(o.y-45*SC,CEIL_Y+30,GROUND_Y-20),vx:0,vy:0,tx:clamp(o.x,40,W-40),ty:clamp(o.y-45*SC,CEIL_Y+30,GROUND_Y-20),held:false,life:260,r:150,rot:0,owner:f};tors.push(t);floatText(f.x,f.y-120*SC,'TORNADO!','#a8ffd0',16);
+          }else if(move==='flame'){
+            f.spCharge.fire=0;f.en-=24;aiFlame={ang:Math.atan2((o.y-40*SC)-(f.y-80*SC),o.x-f.x),t:70};
+          }else if(move==='earth'){
+            f.spCharge.earth=0;f.en-=24;const mid=clamp(o.x+o.vx*5,45,W-45);for(let j=-2;j<=2;j++){rocks.push({x:clamp(mid+j*25,25,W-25),y:GROUND_Y-16,r:16,hp:35,o:f,seed:rand(0,6.28),wall:true});}floatText(f.x,f.y-120*SC,'EARTH PILLARS!','#c8925a',15);
+          }
+        }
+      }
+    }
+    updateChargeBars();
     return inp;
   }
 
@@ -6254,12 +6410,21 @@ function startBodyClash(mpMatchId,mpRole){
      circle            : Tornado (follows the finger, pulls the rival in and traps him)
      touch yourself + swipe : Flamethrower in the swipe direction
      touch the rival   : Freeze (stays frozen until he is hit -> ice shatters + bonus damage)  */
-  const rocks=[],bolts=[],tors=[],trail=[];
+  const rocks=[],bolts=[],tors=[],trail=[],pendingBolts=[],pendingFreezes=[];
   let flame=null;
-  const cd={ltn:0,ice:0,tor:0};
+  const cd={ltn:0,ice:0,tor:0,earth:0,flame:0};
+  const aiCd={ltn:0,ice:0,tor:0,earth:0,flame:0};
+  let specialGlobalCd=0; // shared lockout: changing element cannot bypass cooldown
+  const SPECIAL_GLOBAL_CD=210; // 3.5 seconds at 60 FPS; shared by every player special move
+  let aiFlame=null;
   const G={on:false,id:null,mode:'',pts:[],sx:0,sy:0,last:null,rockOk:false,done:false,tor:null,noEn:0};
   function cpos(e){const r=cvs.getBoundingClientRect();return {x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};}
   function canCast(){return gstate==='fight'&&!p1.ko&&p1.stun<=0&&p1.freeze<=0;}
+  function specialReady(){return true;}
+  function spendSpecialLock(el){
+    /* Power B empties only the bar for the element that was actually used. */
+    if(p1&&p1.spCharge&&el&&Object.prototype.hasOwnProperty.call(CHARGE_MAX,el)){p1.spCharge[el]=0;updateChargeBars();}
+  }
   function pay(c){
     if(p1.en<c){if(G.noEn<=0){floatText(p1.x,p1.y-150*SC,'NO ENERGY','#8892a4',12);G.noEn=40;}return false;}
     p1.en-=c;return true;
@@ -6279,6 +6444,61 @@ function startBodyClash(mpMatchId,mpRole){
     burst(x,y,'#8a6a46',3,2,16,3,{g:0.15,drag:0.94});
     return true;
   }
+  // Build a hand-drawn, continuous mangrove-root-like earth wall.
+  // The wall follows the player's actual stroke; a taller stroke gets a thicker base.
+  function buildEarthWall(points){
+    const first=points&&points[0],last=points&&points[points.length-1];
+    if(!first||!last)return false;
+    if(!specialReady()||!powerBReady('earth',first.x,first.y))return false;
+
+    // Keep the drawn height and direction: do not force a minimum-height pillar.
+    const path=[{x:first.x,y:first.y}];
+    let length=0;
+    for(let i=1;i<points.length;i++){
+      const a=points[i-1],b=points[i],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);
+      if(d<1)continue;
+      length+=d;
+      const steps=Math.max(1,Math.ceil(d/9));
+      for(let j=1;j<=steps;j++)path.push({x:a.x+dx*j/steps,y:a.y+dy*j/steps});
+    }
+    const baseY=first.y, tip=path[path.length-1];
+    const height=Math.max(1,baseY-tip.y);
+    if(height<10||length<12){floatText(first.x,first.y-45,'DRAW UPWARD TO GROW EARTH','#c8925a',12);return false;}
+
+    // Estimate local tangent and its normal, then grow overlapping stones across it.
+    // Width fades from a broad base into a tapered tip, like a mangrove breathing root.
+    const baseHalf=clamp(8+height*0.075,10,29);
+    const specs=[];
+    for(let i=0;i<path.length;i++){
+      const q=path[i],prev=path[Math.max(0,i-1)],next=path[Math.min(path.length-1,i+1)];
+      let dx=next.x-prev.x,dy=next.y-prev.y,dl=Math.hypot(dx,dy)||1;
+      // Normal to the stroke. The top leans exactly in the direction the finger was drawn.
+      const nx=-dy/dl,ny=dx/dl;
+      const t=i/Math.max(1,path.length-1);
+      const half=8+(baseHalf-8)*Math.pow(1-t,0.82);
+      const across=Math.max(1,Math.ceil(half/10));
+      for(let j=-across;j<=across;j++){
+        const off=j*10;
+        if(Math.abs(off)>half+1)continue;
+        specs.push({x:clamp(q.x+nx*off,18,W-18),y:clamp(q.y+ny*off,CEIL_Y,GROUND_Y-7),r:clamp(12.5-(t*2),10.5,12.5)});
+      }
+    }
+    // Height and thickness both cost energy; small hand-drawn roots stay affordable.
+    const cost=length*0.035+height*0.045+baseHalf*0.45+specs.length*0.10;
+    if(!pay(cost))return false;
+    for(const q of specs){
+      rocks.push({x:q.x,y:q.y,r:q.r,hp:45,o:p1,seed:rand(0,6.28),wall:true});
+      if(online)emit('k',{x:r1(q.x),y:r1(q.y)});
+    }
+    while(rocks.length>180)rocks.shift();
+    spendSpecialLock(p1.el);
+    floatText(tip.x,tip.y-24,'EARTH ROOT! -'+Math.ceil(cost)+' ENERGY','#c8925a',14);
+    P(first.x,first.y,0,0,18,10,'#c8925a',{kind:'ring',grow:4,add:true});
+    burst(tip.x,tip.y,'#c8925a',8,2,18,3,{kind:'sq',g:0.15});
+    shake=Math.max(shake,Math.min(8,height/25));
+    spendSpecialLock('earth');
+    return true;
+  }
   function boltFx(x){
     const pts=[];let cx=x;for(let y=0;y<=GROUND_Y;y+=GROUND_Y/9){pts.push({x:cx,y});cx=x+rand(-26,26);}
     pts[pts.length-1].x=x;
@@ -6289,10 +6509,16 @@ function startBodyClash(mpMatchId,mpRole){
   }
   function boltHit(f,x){
     if(f.ko)return;
+    const grounded=groundedAt(x);
+    if(grounded){
+      // Earthing: the stone root conducts the bolt into the ground and protects nearby fighters.
+      for(const R of rocks)if(R.hp>0&&R.y>GROUND_Y-65&&Math.abs(R.x-x)<R.r+22){R.hp-=10;P(R.x,R.y,rand(-1,1),rand(-2,0),18,3,'#ffe94d',{kind:'spark',add:true});}
+      floatText(x,GROUND_Y-35,'GROUNDED!','#ffe94d',13);
+    }
     const d=Math.abs(f.x-x);
     if(d<75){
       if(f.ice)breakIce(f,6);
-      const dmg=Math.round(24*(1-d/110)*10)/10;
+      const dmg=Math.round(24*(1-d/110)*(grounded?0.28:1)*10)/10;
       f.shock=40;f.stun=Math.max(f.stun,30);f.flash=12;f.flashCol='#ffe94d';
       impactFx(f.x,f.y-40*SC,'lightning',1);
       floatText(f.x,f.y-138*SC,'-'+dmg,'#ffe94d',24);
@@ -6300,9 +6526,12 @@ function startBodyClash(mpMatchId,mpRole){
     }
   }
   function doLightning(x){
-    if(!canCast()||cd.ltn>0||!pay(26))return;
-    cd.ltn=45;boltFx(x);
-    if(online)emit('l',{x:r1(x)});else boltHit(p2,x);
+    if(!canCast()||!specialReady()||!powerBReady('lightning',x,GROUND_Y)||!pay(26))return;
+    spendSpecialLock('lightning');
+    // Warning phase gives the opponent time to move before the strike.
+    pendingBolts.push({x:clamp(x,25,W-25),t:48,target:p2,remote:online});
+    floatText(clamp(x,25,W-25),GROUND_Y-45,'LIGHTNING INCOMING!','#ffe94d',14);
+    if(online)emit('lw',{x:r1(clamp(x,25,W-25))});
   }
   function clearIce(f){f.ice=false;f.iceStage=0;f.iceT=0;f.iceK=1;}
   function startFreeze(f){
@@ -6311,17 +6540,30 @@ function startBodyClash(mpMatchId,mpRole){
     P(f.x,f.y-40*SC,0,0,16,8,'#ffffff',{kind:'ring',grow:3,add:true});
     floatText(f.x,f.y-150*SC,'CHILLED','#ffffff',14);return true;
   }
-  function doFreeze(){
+  function spawnIceTrap(x,y,owner=p1){
+    // If the target dodges the marked spot, a chunky ice formation remains there.
+    for(const q of [{dx:0,dy:0,r:28},{dx:-19,dy:-8,r:23},{dx:19,dy:-9,r:24},{dx:-10,dy:-28,r:19},{dx:11,dy:-31,r:20},{dx:0,dy:-47,r:15}]){
+      rocks.push({x:clamp(x+q.dx,20,W-20),y:clamp(y+q.dy,CEIL_Y,GROUND_Y-8),r:q.r,hp:70,o:owner,seed:rand(0,6.28),wall:true,ice:true});
+    }
+    while(rocks.length>220)rocks.shift();
+    burst(x,y-20,'#bff0ff',20,4,28,4,{kind:'sq',add:true});P(x,y-15,0,0,20,10,'#bff0ff',{kind:'ring',grow:5,add:true});
+    floatText(x,y-72,'ICE TRAP!','#bff0ff',15);
+  }
+  function doFreeze(x=p2.x,y=p2.y){
     const f=p2;
-    if(!canCast()||f.ko||cd.ice>0||f.ice||f.iceStage>0||!pay(28))return;
-    cd.ice=240;if(online)emit('z',{});else startFreeze(f);
+    if(!canCast()||!specialReady()||!powerBReady('ice',x,y)||f.ko||f.ice||f.iceStage>0||!pay(28))return;
+    spendSpecialLock('ice');
+    if(online)emit('zw',{x:r1(x),y:r1(y)});
+    pendingFreezes.push({x,y,t:48,target:f,owner:p1});
+    P(x,y-40,0,0,18,9,'#bff0ff',{kind:'ring',grow:4,add:true});
+    floatText(x,y-90,'DODGE THE ICE!','#bff0ff',13);
   }
   function doTornado(c){
-    if(!canCast()||cd.tor>0||tors.length>=2||!pay(30))return null;
-    cd.tor=120;
-    const t={x:c.x,y:c.y,vx:0,vy:0,tx:c.x,ty:c.y,held:true,life:420,r:150,rot:0};
+    if(!canCast()||!specialReady()||!powerBReady('wind',c.x,c.y)||tors.length>=2||!pay(30))return null;
+    spendSpecialLock('wind');
+    const t={x:c.x,y:c.y,vx:0,vy:0,tx:c.x,ty:c.y,held:true,life:420,r:150,rot:0,warning:42};
     tors.push(t);P(c.x,c.y,0,0,16,10,'#a8ffd0',{add:true,kind:'ring',grow:5});
-    floatText(c.x,c.y-90,'TORNADO','#a8ffd0',16);
+    floatText(c.x,c.y-90,'TORNADO INCOMING!','#eafff4',14);
     return t;
   }
   function checkCircle(){
@@ -6342,7 +6584,7 @@ function startBodyClash(mpMatchId,mpRole){
     G.on=true;G.id=e.pointerId;G.sx=p.x;G.sy=p.y;G.pts=[p];G.done=false;G.tor=null;G.last=null;G.rockOk=false;
     try{cvs.setPointerCapture(e.pointerId);}catch(_){}
     const d1=Math.hypot(p.x-p1.x,p.y-(p1.y-40*SC)),d2=Math.hypot(p.x-p2.x,p.y-(p2.y-40*SC));
-    if(d2<58&&d2<=d1){G.mode='freeze';G.done=true;doFreeze();}
+    if(d2<58&&d2<=d1){G.mode='freeze';G.done=true;doFreeze(p.x,p.y);}
     else if(d1<58)G.mode='flame';
     else if(p.y>GROUND_Y-55)G.mode='earth';
     else if(p.y<150)G.mode='sky';
@@ -6354,24 +6596,26 @@ function startBodyClash(mpMatchId,mpRole){
     e.preventDefault();
     const p=cpos(e);G.pts.push(p);if(G.pts.length>90)G.pts.shift();
     trail.push({x:p.x,y:p.y,l:22,m:G.mode});if(trail.length>60)trail.shift();
-    if(gstate!=='fight'||!canCast())return;
+    if(gstate!=='fight')return;
     const m=G.mode;
+    const frozenFireEscape=(m==='flame'&&p1.el==='fire'&&!p1.ko&&(p1.ice||p1.iceStage>0||p1.freeze>0));
+    if(!canCast()&&!frozenFireEscape)return;
     if(G.tor){G.tor.tx=p.x;G.tor.ty=p.y;return;}
     if(m==='flame'){
       const ref=G.pts[Math.max(0,G.pts.length-6)],dx=p.x-ref.x,dy=p.y-ref.y;
       if(Math.hypot(p.x-G.sx,p.y-G.sy)>30&&Math.hypot(dx,dy)>3){
-        if(!flame)flame={ang:0,t:0};
+        if(!flame){
+          const emergency=p1.ice||p1.iceStage>0||p1.freeze>0;
+          // Fire can melt the ice cage from the inside. This defensive counter has its own cooldown.
+          if(emergency){if(!powerBReady('fire')||!pay(28))return;cd.flame=0;clearIce(p1);p1.freeze=0;p1.stun=Math.min(p1.stun,4);p1.vx=0;burst(p1.x,p1.y-40*SC,'#ff7a2e',34,7,30,5,{add:true,g:-0.04});burst(p1.x,p1.y-40*SC,'#ffd23e',18,5,24,4,{add:true});P(p1.x,p1.y-40*SC,0,0,22,18,'#ff9a3c',{kind:'ring',grow:7,add:true});floatText(p1.x,p1.y-145*SC,'FIRE MELTS ICE!','#ffb347',15);spendSpecialLock('fire');}
+          else{if(!specialReady()||!powerBReady('fire')||!pay(18))return;cd.flame=0;spendSpecialLock('fire');}
+          flame={ang:0,t:0};floatText(p1.x,p1.y-145*SC,emergency?'FIRE ESCAPE!':'FLAME BURST!','#ff7a2e',14);
+        }
         flame.ang=Math.atan2(dy,dx);flame.t=Math.max(flame.t,28);
       }
     } else if(m==='earth'){
-      if(!G.rockOk&&G.sy-p.y>14){G.rockOk=true;if(addRock(G.sx,G.sy))G.last={x:G.sx,y:G.sy};else G.last={x:G.sx,y:G.sy};}
-      if(G.rockOk&&G.last){
-        for(let k=0;k<5;k++){
-          const L=G.last,d=Math.hypot(p.x-L.x,p.y-L.y);if(d<13)break;
-          const nx=L.x+(p.x-L.x)/d*13,ny=L.y+(p.y-L.y)/d*13;
-          if(!addRock(nx,ny))break;G.last={x:nx,y:ny};
-        }
-      }
+      // Keep the full finger path so the player can draw curves, hooks, and leaning roots.
+      if(G.sy-p.y>6){G.rockOk=true;G.last={x:p.x,y:p.y};}
     } else if(m==='sky'||m==='free'){
       if(!G.done&&m==='sky'&&p.y-G.sy>110&&Math.abs(p.x-G.sx)<(p.y-G.sy)*0.8){doLightning(p.x);G.done=true;return;}
       if(!G.done){const c=checkCircle();if(c){G.done=true;G.tor=doTornado(c);if(G.tor){G.tor.tx=p.x;G.tor.ty=p.y;}}}
@@ -6379,10 +6623,26 @@ function startBodyClash(mpMatchId,mpRole){
   });
   const gEnd=e=>{
     if(!G.on||e.pointerId!==G.id)return;
-    G.on=false;if(G.tor){G.tor.held=false;G.tor=null;}
+    G.on=false;
+    if(G.mode==='earth'&&G.rockOk&&G.pts.length>1&&canCast())buildEarthWall(G.pts);
+    if(G.tor){G.tor.held=false;G.tor=null;}
   };
   cvs.addEventListener('pointerup',gEnd);cvs.addEventListener('pointercancel',gEnd);
 
+  // A wall blocks line-of-sight attacks, not only fire.
+  function earthWallBlocks(ox,oy,tx,ty){
+    const dx=tx-ox,dy=ty-oy,len2=dx*dx+dy*dy||1;
+    for(const R of rocks){
+      if(!R.wall||R.hp<=0)continue;
+      const t=((R.x-ox)*dx+(R.y-oy)*dy)/len2;
+      if(t<=0.02||t>=0.98)continue;
+      const px=ox+dx*t,py=oy+dy*t;
+      if(Math.hypot(R.x-px,R.y-py)<=R.r+13)return true;
+    }
+    return false;
+  }
+  // Earth-wall stones block fire between the flame source and the fighter behind them.
+  function fireBlockedByEarthWall(ox,oy,tx,ty){return earthWallBlocks(ox,oy,tx,ty);}
   function flameStep(att,fl,def){
     const s=shoulder(att),a=fl.ang,k=att.sc||1;
     const ox=att.x+(s.x-att.x)*k+Math.cos(a)*16*k,oy=att.y+(s.y-att.y)*k+Math.sin(a)*16*k;
@@ -6391,26 +6651,33 @@ function startBodyClash(mpMatchId,mpRole){
     if(def&&!def.ko){
       const bx=def.x-ox,by=(def.y-40*SC)-oy,d=Math.hypot(bx,by);
       let da=Math.atan2(by,bx)-a;while(da>Math.PI)da-=2*Math.PI;while(da<-Math.PI)da+=2*Math.PI;
-      if(d<430&&Math.abs(da)<0.3+60/Math.max(d,60)*0.3){
+      const blocked=fireBlockedByEarthWall(ox,oy,def.x,def.y-40*SC);
+      if(d<430&&Math.abs(da)<0.3+60/Math.max(d,60)*0.3&&!blocked){
         if(def.ice)breakIce(def,6);if(def.iceStage>0&&!def.ice)clearIce(def);
         def.burn=Math.max(def.burn,100);def.burnPow=0.9;def.flash=Math.max(def.flash,2);def.flashCol='#ff7a2e';def.vx+=Math.cos(a)*0.2;
         applyDamage(def,0.3,false);
         if(att.t%12===0)floatText(def.x+rand(-8,8),def.y-138*SC,'-3','#ff9a3c',15);
+      }else if(d<430&&blocked&&att.t%18===0){
+        floatText(def.x,def.y-138*SC,'EARTH WALL BLOCKED FIRE','#c8925a',11);
       }
     }
-    for(const R of rocks){if(Math.hypot(R.x-ox,R.y-oy)<400){const rd=Math.atan2(R.y-oy,R.x-ox)-a;if(Math.abs(Math.atan2(Math.sin(rd),Math.cos(rd)))<0.3)R.hp-=0.4;}}
+    for(const R of rocks){if(Math.hypot(R.x-ox,R.y-oy)<400){const rd=Math.atan2(R.y-oy,R.x-ox)-a;if(Math.abs(Math.atan2(Math.sin(rd),Math.cos(rd)))<0.3){/* fire heats stone but does not break it */ if(R.hp>0&&R.hp<45)R.hp=Math.min(45,R.hp+0.015);}}}
   }
   function tornPull(t,f){
     if(f.ko)return;
     const cx=f.x,cy=f.y-40*SC,dx=t.x-cx,dy=t.y-cy,d=Math.hypot(dx,dy)||1;
-    if(d<t.r){
+    if(d<t.r&&!earthWallBlocks(t.x,t.y,cx,cy)){
+      if(t.warning>0)return; // telegraph first: no damage or pull during the warning
       if(f.ice)breakIce(f,6);
+      f.tornadoed=Math.max(f.tornadoed,12); // attacks remain possible, but aim is disturbed
       if(d<48){
-        f.stun=Math.max(f.stun,8);f.vx=0;f.vy=0;f.onGround=false;
-        f.x+=(t.x-f.x)*0.1;f.y=Math.min(GROUND_Y,f.y+((t.y+40*SC)-f.y)*0.1);
-        if(t.life%15===0){applyDamage(f,0.8,false);floatText(f.x,f.y-138*SC,'-1','#a8ffd0',14);f.flash=4;f.flashCol='#a8ffd0';}
+        f.vx+=(dx/d)*0.72 + Math.sin(t.rot*1.7)*0.55;
+        f.vy+=(dy/d)*0.48 - 0.25;
+        f.onGround=false;
+        if(t.life%24===0){applyDamage(f,0.45,false);floatText(f.x,f.y-138*SC,'-0.5','#a8ffd0',12);f.flash=3;f.flashCol='#a8ffd0';}
       } else {
-        f.vx+=dx/d*0.55;f.vy+=dy/d*0.55;if(dy<0&&f.y<GROUND_Y+1)f.onGround=false;
+        f.vx+=dx/d*0.34 + Math.sin(t.rot+f.x*0.03)*0.12;
+        f.vy+=dy/d*0.28;if(dy<0&&f.y<GROUND_Y+1)f.onGround=false;
       }
     }
   }
@@ -6422,7 +6689,22 @@ function startBodyClash(mpMatchId,mpRole){
     floatText(f.x,f.y-190*SC,'TITAN FADES','#c8925a',13);
   }
   function updateSpecials(){
-    if(cd.ltn>0)cd.ltn--;if(cd.ice>0)cd.ice--;if(cd.tor>0)cd.tor--;if(G.noEn>0)G.noEn--;
+    if(cd.ltn>0)cd.ltn--;if(cd.ice>0)cd.ice--;if(cd.tor>0)cd.tor--;if(cd.earth>0)cd.earth--;if(cd.flame>0)cd.flame--;updateGestureBars();
+    for(let i=pendingBolts.length-1;i>=0;i--){
+      const b=pendingBolts[i];b.t--;
+      if(b.t<=0){boltFx(b.x);if(!(b.remote&&online)&&b.target)boltHit(b.target,b.x);pendingBolts.splice(i,1);}
+    }
+    for(let i=pendingFreezes.length-1;i>=0;i--){
+      const z=pendingFreezes[i];z.t--;
+      if(z.t<=0){
+        const f=z.target;
+        if(f&&!f.ko&&Math.hypot(f.x-z.x,(f.y-40*SC)-z.y)<62&&!earthWallBlocks(z.x,z.y,f.x,f.y-40*SC))startFreeze(f);
+        else spawnIceTrap(z.x,z.y,z.owner||p1);
+        pendingFreezes.splice(i,1);
+      }
+    }
+    for(const f of [p1,p2])if(f.superCd>0)f.superCd--;
+    for(const k of Object.keys(aiCd))if(aiCd[k]>0)aiCd[k]--;if(G.noEn>0)G.noEn--;
     for(let i=trail.length-1;i>=0;i--)if(--trail[i].l<=0)trail.splice(i,1);
     for(let i=bolts.length-1;i>=0;i--)if(--bolts[i].l<=0)bolts.splice(i,1);
     if(gstate!=='fight'&&gstate!=='roundEnd'){flame=null;}
@@ -6454,6 +6736,7 @@ function startBodyClash(mpMatchId,mpRole){
         if(Math.abs(f.sc-1)<0.01&&f.titan<=0)f.sc=1;
       }
       if(f.titan>0){
+        f.slow=Math.max(0,f.slow-0.02); f.shock=Math.max(0,f.shock-0.02);
         if(f.t%2===0)P(f.x+rand(-30,30),GROUND_Y+2,rand(-0.5,0.5),rand(-3.5,-1),26,rand(3,6),'#8a6a46',{kind:'sq',g:0.12});
         if(f.onGround&&Math.abs(f.vx)>1.5&&f.t%14===0)shake=Math.max(shake,3);
       }
@@ -6476,15 +6759,20 @@ function startBodyClash(mpMatchId,mpRole){
       p2.hR.x=s.x+Math.cos(a)*ARM*0.85;p2.hR.y=s.y+Math.sin(a)*ARM*0.85;
       flameStep(p2,rflame,p1);
     }
+    /* AI rival's flamethrower */
+    if(aiFlame){
+      if(p2.ko||p2.stun>0||p2.freeze>0||gstate!=='fight'||aiFlame.t<=0||p2.en<=0.4){aiFlame=null;}
+      else{p2.en-=0.4;aiFlame.t--;aiFlame.ang=Math.atan2((p1.y-40*SC)-(p2.y-80*SC),p1.x-p2.x);flameStep(p2,aiFlame,p1);}
+    }
     /* own tornadoes */
     for(let i=tors.length-1;i>=0;i--){
-      const t=tors[i];t.life--;t.rot+=0.35;
+      const t=tors[i];t.life--;t.rot+=0.35;if(t.warning>0){t.warning--;if(t.warning===0)floatText(t.x,t.y-100,'TORNADO ACTIVE!','#a8ffd0',14);}
       if(t.held){t.vx+=((t.tx-t.x)*0.06-t.vx)*0.2;t.vy+=((t.ty-t.y)*0.06-t.vy)*0.2;}
       else{t.vx*=0.985;t.vy*=0.985;}
       const sp2=Math.hypot(t.vx,t.vy);if(sp2>6){t.vx*=6/sp2;t.vy*=6/sp2;}
       t.x=clamp(t.x+t.vx,40,W-40);t.y=clamp(t.y+t.vy,CEIL_Y+30,GROUND_Y-20);
       tornFx(t);
-      if(!online)tornPull(t,p2);
+      if(!online)tornPull(t,t.owner===p1?p2:p1);
       if(t.life<=0)tors.splice(i,1);
     }
     /* rival's tornadoes (online) */
@@ -6505,8 +6793,13 @@ function startBodyClash(mpMatchId,mpRole){
         if(d<mn){
           const nx=dx/d,ny=dy/d,push=mn-d;
           f.x+=nx*push;f.y=clamp(f.y+ny*push*0.5,CEIL_Y,GROUND_Y);
-          if(Math.abs(f.vx)>3||f.titan>0)R.hp-=0.4+(f.titan>0?1.5:0);
-          if(Math.abs(nx)>0.5)f.vx*=0.5;
+          if(f.titan>0){
+            // Titan impact is a deliberate wall-breaking action, not a tiny passive chip.
+            const impact=R.wall?(5.5+Math.abs(f.vx)*3.2):(2.4+Math.abs(f.vx)*1.1);
+            R.hp-=impact;
+            if(R.wall){P(R.x,R.y,rand(-1.5,1.5),rand(-2.5,0.2),16,rand(3,6),'#b58a5b',{kind:'sq',g:0.16});shake=Math.max(shake,Math.min(6,impact*0.35));}
+          }else if(Math.abs(f.vx)>3)R.hp-=0.4;
+          if(Math.abs(nx)>0.5)f.vx*=f.titan>0?0.78:0.5;
         }
       }
     }
@@ -6516,9 +6809,8 @@ function startBodyClash(mpMatchId,mpRole){
       const k=Math.max(0.35,R.hp/45);
       ctx.save();ctx.translate(R.x,R.y);ctx.rotate(R.seed);
       ctx.beginPath();for(let j=0;j<7;j++){const a=j*Math.PI*2/7,rr=R.r*(0.88+0.2*Math.sin(R.seed*3+j*2.1));const x=Math.cos(a)*rr,y=Math.sin(a)*rr;if(j===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.closePath();
-      ctx.fillStyle='rgb('+Math.round(120*k+30)+','+Math.round(90*k+25)+','+Math.round(60*k+20)+')';ctx.fill();
-      ctx.strokeStyle='#3a2616';ctx.lineWidth=1.5;ctx.stroke();
-      ctx.fillStyle='rgba(255,230,190,.22)';ctx.beginPath();ctx.arc(-R.r*0.25,-R.r*0.3,R.r*0.35,0,6.3);ctx.fill();
+      if(R.ice){ctx.fillStyle='rgb('+Math.round(110*k+95)+','+Math.round(170*k+65)+','+Math.round(205*k+45)+')';ctx.fill();ctx.strokeStyle='#e5fbff';ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(-R.r*.45,R.r*.2);ctx.lineTo(-R.r*.1,-R.r*.55);ctx.lineTo(R.r*.1,-R.r*.05);ctx.lineTo(R.r*.42,-R.r*.35);ctx.strokeStyle='rgba(255,255,255,.8)';ctx.lineWidth=1.5;ctx.stroke();}
+      else {ctx.fillStyle='rgb('+Math.round(120*k+30)+','+Math.round(90*k+25)+','+Math.round(60*k+20)+')';ctx.fill();ctx.strokeStyle='#3a2616';ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle='rgba(255,230,190,.22)';ctx.beginPath();ctx.arc(-R.r*0.25,-R.r*0.3,R.r*0.35,0,6.3);ctx.fill();}
       ctx.restore();
     }
   }
@@ -6552,7 +6844,8 @@ function startBodyClash(mpMatchId,mpRole){
     /* tornadoes */
     for(const t of tors){
       const fade=Math.min(1,t.life/40);
-      ctx.save();ctx.globalAlpha=0.75*fade;
+      ctx.save();ctx.globalAlpha=t.warning>0?0.32:0.75*fade;
+      if(t.warning>0){ctx.strokeStyle='#eafff4';ctx.lineWidth=3;ctx.setLineDash([8,7]);ctx.beginPath();ctx.arc(t.x,t.y,Math.max(26,t.r*(1-t.warning/42)),0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#eafff4';ctx.font='bold 13px Arial';ctx.textAlign='center';ctx.fillText('TORNADO IN '+(t.warning/60).toFixed(1)+'s',t.x,t.y-105);}
       for(let k=0;k<9;k++){
         const yy=t.y-90+k*21,w=14+k*8+Math.sin(t.rot+k)*4;
         ctx.strokeStyle='rgba(200,255,225,'+(0.35+0.04*k)+')';ctx.lineWidth=3;
@@ -6576,7 +6869,7 @@ function startBodyClash(mpMatchId,mpRole){
   /* ======================= SUPER MOVES (hold the attack stick ~1.7 s, then release) =======================
      fire: giant fireball · wind: giant piercing blade · ice: ice beam (freezes) · earth: meteor from the sky
      lightning: whole body crackles, bolts leap from the hands                                           */
-  const SUPER_T=100,TITAN_T=540,TITAN_SC=2.1;
+  const SUPER_T=75,TITAN_T=2100,TITAN_SC=5.0;
   function sp(f,p){const k=f.sc||1;return {x:f.x+(p.x-f.x)*k,y:f.y+(p.y-f.y)*k};}
   const beams=[],arcs=[];
   function zig(x1,y1,x2,y2){
@@ -6601,8 +6894,9 @@ function startBodyClash(mpMatchId,mpRole){
   function pjData(pj){return {el:pj.el,x:r1(pj.x),y:r1(pj.y),vx:r1(pj.vx),vy:r1(pj.vy),r:r1(pj.r),pw:r1(pj.pw),ang:r1(pj.ang),life:pj.life,pr:pj.pierce?1:0,big:pj.big?1:0,fist:pj.fist?1:0};}
   function castSuper(f,ang){
     if(f.ko||f.stun>0||f.freeze>0||f.atk.cd>0||f.titan>0)return false;
-    if(f.en<45)return false;
-    f.en-=45;f.atk.cd=45;f.atk.kick=1.6;
+    /* POWER A is independent: no Power B meter requirement and it does not empty bars. */
+    if(f.en<45){if(f===p1)floatText(f.x,f.y-145*SC,'NEED 45 ENERGY','#8892a4',12);return false;}
+    f.en-=45;f.atk.cd=45;f.superCd=0;f.atk.kick=1.6;
     const o=f===p1?p2:p1,E=EL[f.el],h=sp(f,f.hR),hx=h.x,hy=h.y,ex=Math.cos(ang),ey=Math.sin(ang);
     shake=Math.max(shake,6);
     floatText(f.x,f.y-165*SC,'SUPER '+E.name,E.col,16);
@@ -6618,16 +6912,16 @@ function startBodyClash(mpMatchId,mpRole){
       f.titan=TITAN_T;f.stun=0;
       for(let k=0;k<30;k++)P(f.x+rand(-40,40),GROUND_Y+2,rand(-2,2),rand(-7,-2),42,rand(4,9),k%3?'#8a6a46':'#6b4a2a',{kind:'sq',g:0.22});
       P(f.x,GROUND_Y,0,0,22,10,'#c8925a',{kind:'ring',grow:6,add:true});
-      shake=Math.max(shake,12);floatText(f.x,f.y-190*SC,'TITAN!','#c8925a',20);
+      shake=Math.max(shake,12);floatText(f.x,f.y-190*SC,'TITAN GIANT!','#c8925a',20);
       if(online&&f===p1)emit('t',{});
     } else if(f.el==='ice'){
       let len=620;
-      for(const R of rocks){const rx=R.x-hx,ry=R.y-hy,t=rx*ex+ry*ey;if(t<0||t>len)continue;if(Math.abs(rx*ey-ry*ex)<R.r+10){len=t;R.hp-=25;}}
+      for(const R of rocks){const rx=R.x-hx,ry=R.y-hy,t=rx*ex+ry*ey;if(t<0||t>len)continue;if(Math.abs(rx*ey-ry*ex)<R.r+10){len=t;if(R.wall)R.hp-=R.ice?7:4;}}
       if(online){
         emit('b',{x:r1(hx),y:r1(hy),a:r1(ang),n:Math.round(len)});
       } else if(!o.ko){
         const rx=o.x-hx,ry=(o.y-40*SC)-hy,t=rx*ex+ry*ey;
-        if(t>0&&t<len&&Math.abs(rx*ey-ry*ex)<34){if(superHit(f,o,18,'ice',30))startFreeze(o);}
+        if(t>0&&t<len&&Math.abs(rx*ey-ry*ex)<34&&!earthWallBlocks(hx,hy,o.x,o.y-40*SC)){if(superHit(f,o,18,'ice',30))startFreeze(o);}
       }
       beams.push({x:hx,y:hy,ang,len,l:26,max:26});
       burst(hx,hy,'#bff0ff',14,6,24,3,{add:true});
@@ -6637,7 +6931,7 @@ function startBodyClash(mpMatchId,mpRole){
       let inCone=false;
       if(!online&&!o.ko){
         const dx=o.x-hx,dy=(o.y-40*SC)-hy,d=Math.hypot(dx,dy);let da=Math.atan2(dy,dx)-ang;da=Math.atan2(Math.sin(da),Math.cos(da));
-        if(d<400&&Math.abs(da)<0.5){inCone=true;if(superHit(f,o,22,'lightning',50))o.shock=60;}
+        if(d<400&&Math.abs(da)<0.5&&!earthWallBlocks(hx,hy,o.x,o.y-40*SC)){inCone=true;if(superHit(f,o,22,'lightning',50))o.shock=60;}
       }
       for(let k=0;k<6;k++){const aa=ang+rand(-0.45,0.45),L=rand(200,380);arcs.push({pts:zig(hx,hy,hx+Math.cos(aa)*L,hy+Math.sin(aa)*L),l:16,max:16});}
       if(inCone)for(let k=0;k<2;k++)arcs.push({pts:zig(hx,hy,o.x,o.y-40*SC),l:16,max:16});
@@ -6691,8 +6985,8 @@ function startBodyClash(mpMatchId,mpRole){
     p1=makeFighter(1,mx,'#00e5a0');p2=makeFighter(2,ox,'#ff3b5c');p1.el=el;
     if(online)p2.remote=true;
     projs.length=0;parts.length=0;texts.length=0;timeScale=1;shake=0;vig=0;
-    rocks.length=0;bolts.length=0;tors.length=0;rtors.length=0;rflame=null;trail.length=0;beams.length=0;arcs.length=0;flame=null;cd.ltn=cd.ice=cd.tor=0;
-    syncElemUI();
+    rocks.length=0;bolts.length=0;tors.length=0;rtors.length=0;rflame=null;aiFlame=null;trail.length=0;beams.length=0;arcs.length=0;flame=null;cd.ltn=cd.ice=cd.tor=cd.earth=cd.flame=0;specialGlobalCd=0;p1.superCd=p2.superCd=0;for(const k of Object.keys(aiCd))aiCd[k]=0;updateGestureBars();
+    syncElemUI();updateChargeBars();
   }
   function setRoundMsg(){
     const me=isHost?'h':'g';
@@ -6705,11 +6999,11 @@ function startBodyClash(mpMatchId,mpRole){
     if(online&&!isHost)return;
     if(online&&!rnet){showToast('⏳ Waiting for your opponent to connect…');return;}
     round=1;wins1=0;wins2=0;ridLocal++;roundWin=null;resetFighters();
-    roundTimer=75;gstate='countdown';stateT=0;cdT=2.4;
+    roundTimer=Infinity;gstate='countdown';stateT=0;cdT=2.4;
   }
   function nextRound(){
     if(wins1>=2||wins2>=2||round>=maxRounds){gstate='matchEnd';stateT=0;timeScale=1;return;}
-    round++;ridLocal++;roundWin=null;resetFighters();roundTimer=75;gstate='countdown';stateT=0;cdT=2.4;
+    round++;ridLocal++;roundWin=null;resetFighters();roundTimer=Infinity;gstate='countdown';stateT=0;cdT=2.4;
   }
 
   /* ---------- simulation step (fixed 60 Hz) ---------- */
@@ -6722,6 +7016,7 @@ function startBodyClash(mpMatchId,mpRole){
     const i1=fighting?playerInput():NEUTRAL();
     const i2=(online||!fighting)?NEUTRAL():aiInput(p2,p1);
     updateFighter(p1,i1,p2);updateFighter(p2,i2,p1);
+    updateChargeBars();
     updateSpecials();updateSupers();
     const dx=p2.x-p1.x;
     if(Math.abs(dx)<36*SC&&Math.abs(p1.y-p2.y)<110*SC&&!p1.ko&&!p2.ko){
@@ -6730,25 +7025,12 @@ function startBodyClash(mpMatchId,mpRole){
     }
     updateProjectiles();updateParticles();
     shake*=0.88;if(vig>0)vig*=0.93;
-    if(fighting){
-      roundTimer=Math.max(0,roundTimer-DT/1000);
-      if(!online){
-        if(roundTimer<=0){
-          roundTimer=0;gstate='roundEnd';stateT=0;
-          if(p1.hp>p2.hp){wins1++;msg='TIME UP — YOU WIN';msgCol='#3ddc84';}
-          else if(p2.hp>p1.hp){wins2++;msg='TIME UP — RIVAL WINS';msgCol='#ff4d5e';}
-          else{msg='DRAW';msgCol='#ffd894';}
-        }
-      } else if(isHost){
-        if(p1.ko||p2.ko){
-          gstate='roundEnd';stateT=0;roundTU=false;
-          if(p1.ko&&p2.ko)roundWin='d';else if(p2.ko){wins1++;roundWin='h';}else{wins2++;roundWin='g';}
-          setRoundMsg();
-        } else if(roundTimer<=0){
-          gstate='roundEnd';stateT=0;roundTU=true;
-          if(p1.hp>p2.hp){wins1++;roundWin='h';}else if(p2.hp>p1.hp){wins2++;roundWin='g';}else roundWin='d';
-          setRoundMsg();
-        }
+    if(fighting&&online&&isHost){
+      // Unlimited match time: only a knockout can end the round.
+      if(p1.ko||p2.ko){
+        gstate='roundEnd';stateT=0;roundTU=false;
+        if(p1.ko&&p2.ko)roundWin='d';else if(p2.ko){wins1++;roundWin='h';}else{wins2++;roundWin='g';}
+        setRoundMsg();
       }
     } else if(gstate==='roundEnd'){
       if(timeScale<1&&stateT>0.5)timeScale=1;
@@ -6804,6 +7086,10 @@ function startBodyClash(mpMatchId,mpRole){
     } else if(d.k==='k'){
       rocks.push({x:d.x,y:d.y,r:13,hp:45,o:p2,seed:rand(0,6.28)});
       if(rocks.length>90)rocks.shift();burst(d.x,d.y,'#8a6a46',3,2,16,3,{g:0.15,drag:0.94});
+    } else if(d.k==='lw'){
+      pendingBolts.push({x:d.x,t:48,target:p1,remote:false});floatText(d.x,GROUND_Y-45,'LIGHTNING INCOMING!','#ffe94d',14);
+    } else if(d.k==='zw'){
+      pendingFreezes.push({x:d.x,y:d.y,t:48,target:p1,owner:p2});P(d.x,d.y-40,0,0,18,9,'#bff0ff',{kind:'ring',grow:4,add:true});floatText(d.x,d.y-90,'DODGE THE ICE!','#bff0ff',13);
     } else if(d.k==='l'){
       boltFx(d.x);if(gstate==='fight')boltHit(p1,d.x);
     } else if(d.k==='z'){
@@ -6818,11 +7104,11 @@ function startBodyClash(mpMatchId,mpRole){
       for(let k=0;k<6;k++){const aa=d.a+rand(-0.45,0.45),L=rand(200,380);arcs.push({pts:zig(d.x,d.y,d.x+Math.cos(aa)*L,d.y+Math.sin(aa)*L),l:16,max:16});}
       if(gstate==='fight'&&!p1.ko){
         const dx=p1.x-d.x,dy=(p1.y-40*SC)-d.y,dd=Math.hypot(dx,dy);let da=Math.atan2(dy,dx)-d.a;da=Math.atan2(Math.sin(da),Math.cos(da));
-        if(dd<400&&Math.abs(da)<0.5){arcs.push({pts:zig(d.x,d.y,p1.x,p1.y-40*SC),l:16,max:16});if(superHit(p2,p1,22,'lightning',50))p1.shock=60;}
+        if(dd<400&&Math.abs(da)<0.5&&!earthWallBlocks(d.x,d.y,p1.x,p1.y-40*SC)){arcs.push({pts:zig(d.x,d.y,p1.x,p1.y-40*SC),l:16,max:16});if(superHit(p2,p1,22,'lightning',50))p1.shock=60;}
       }
     } else if(d.k==='t'){
       for(let k=0;k<30;k++)P(p2.x+rand(-40,40),GROUND_Y+2,rand(-2,2),rand(-7,-2),42,rand(4,9),k%3?'#8a6a46':'#6b4a2a',{kind:'sq',g:0.22});
-      shake=Math.max(shake,10);floatText(p2.x,p2.y-190*SC,'TITAN!','#c8925a',20);
+      shake=Math.max(shake,10);floatText(p2.x,p2.y-190*SC,'TITAN GIANT!','#c8925a',20);
     }
   }
   function applyHostG(g){
@@ -6880,6 +7166,7 @@ function startBodyClash(mpMatchId,mpRole){
     const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1a0f2e');g.addColorStop(0.7,'#2a1442');g.addColorStop(1,'#05030a');
     ctx.fillStyle=g;ctx.fillRect(-20,-20,W+40,H+40);
     const tm=Date.now()/1000;
+    if(pendingBolts.length){const warn=Math.max(...pendingBolts.map(b=>Math.max(0,1-b.t/48)));ctx.fillStyle='rgba(255,218,65,'+(0.08+0.16*warn)+')';ctx.fillRect(-20,-20,W+40,GROUND_Y+40);ctx.fillStyle='rgba(255,236,120,.22)';for(const b of pendingBolts){ctx.beginPath();ctx.moveTo(b.x-18,0);ctx.lineTo(b.x+18,0);ctx.lineTo(b.x+5,GROUND_Y);ctx.lineTo(b.x-5,GROUND_Y);ctx.closePath();ctx.fill();}}
     stars.forEach(s=>{ctx.globalAlpha=0.4+0.4*Math.sin(tm*1.5+s.p);ctx.fillStyle='#fff';ctx.fillRect(s.x,s.y,s.r,s.r);});
     ctx.globalAlpha=1;
     ctx.fillStyle='rgba(255,236,200,.9)';ctx.beginPath();ctx.arc(780,95,34,0,7);ctx.fill();
@@ -6978,27 +7265,83 @@ function startBodyClash(mpMatchId,mpRole){
     ctx.restore();
   }
   function drawFighterX(f){
+    // Titans always turn their face toward the actual opponent, not toward a stale movement direction.
+    const oldFace=f.face,foe=(f===p1?p2:p1);
+    if(f.titan>0&&!f.ko&&foe)f.face=foe.x>=f.x?1:-1;
     if(f.sc>1.02||f.titan>0){
       ctx.save();ctx.translate(f.x,f.y);ctx.scale(f.sc,f.sc);ctx.translate(-f.x,-f.y);
-      drawFighter(f);if(f.titan>0&&!f.ko)drawTitanSkin(f);
+      if(f.titan>0&&!f.ko)drawTitanSkin(f);else drawFighter(f);
       ctx.restore();
     } else drawFighter(f);
+    f.face=oldFace;
   }
   function drawTitanSkin(f){
     const sh=shoulder(f),hip={x:f.x,y:f.y-LEG},hd={x:sh.x+Math.sin(f.lean)*13,y:sh.y-Math.cos(f.lean)*13};
     const rock=(x,y,r,seed)=>{
-      ctx.beginPath();for(let j=0;j<7;j++){const a=j*Math.PI*2/7+seed,rr=r*(0.85+0.25*Math.sin(seed*5+j*2.3));const px=x+Math.cos(a)*rr,py=y+Math.sin(a)*rr;if(j===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}
-      ctx.closePath();ctx.fillStyle='#7a5a38';ctx.fill();ctx.strokeStyle='#2e1d10';ctx.lineWidth=1.4;ctx.stroke();
-      ctx.fillStyle='rgba(255,230,190,.2)';ctx.beginPath();ctx.arc(x-r*0.25,y-r*0.3,r*0.35,0,6.3);ctx.fill();
+      ctx.beginPath();
+      for(let j=0;j<8;j++){
+        const a=j*Math.PI*2/8+seed,rr=r*(0.88+0.12*Math.sin(seed*4+j*2.1));
+        const px=x+Math.cos(a)*rr,py=y+Math.sin(a)*rr;
+        if(j===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+      }
+      ctx.closePath();ctx.fillStyle='#806044';ctx.fill();ctx.strokeStyle='#302014';ctx.lineWidth=1.8;ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x-r*.48,y-r*.22);ctx.lineTo(x-r*.08,y-r*.42);ctx.lineTo(x+r*.28,y-r*.12);
+      ctx.strokeStyle='rgba(235,205,160,.62)';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.beginPath();ctx.arc(x-r*.24,y-r*.24,r*.17,0,Math.PI*2);ctx.fillStyle='rgba(255,232,190,.22)';ctx.fill();
     };
+    const limb=(a,b,w)=>{
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+      ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#332216';ctx.lineWidth=w+4;ctx.stroke();
+      ctx.strokeStyle='#795735';ctx.lineWidth=w;ctx.stroke();
+      // clear segmented armor plates make the limb direction and joints readable
+      const d=Math.hypot(b.x-a.x,b.y-a.y)||1,n=Math.max(2,Math.floor(d/10));
+      for(let i=0;i<=n;i++){const t=i/n;rock(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,w*.48,0.4+i*.73);}
+    };
+    const stride=f.onGround&&!f.ko?Math.min(1,Math.abs(f.vx)/2.2):0;
+    const phase=(f.walkPh||f.t*0.12),swing=Math.sin(phase)*stride;
+    const armR={x:f.hR.x+f.face*9*SC+Math.cos(phase)*15*SC*stride,y:f.hR.y+Math.abs(swing)*7*SC};
+    const armL={x:f.hL.x+f.face*7*SC-Math.cos(phase)*15*SC*stride,y:f.hL.y+Math.abs(swing)*7*SC};
+    const kneeR={x:f.x+7*SC+Math.sin(phase)*10*SC*stride,y:f.y-LEG*.48+Math.max(0,-swing)*8*SC};
+    const kneeL={x:f.x-7*SC-Math.sin(phase)*10*SC*stride,y:f.y-LEG*.48+Math.max(0,swing)*8*SC};
+    const footR={x:f.x+8*SC+Math.sin(phase)*19*SC*stride,y:f.y-2*SC-Math.max(0,-swing)*14*SC};
+    const footL={x:f.x-8*SC-Math.sin(phase)*19*SC*stride,y:f.y-2*SC-Math.max(0,swing)*14*SC};
     ctx.save();
-    rock(f.x,f.y-LEG*0.45,8,0.3);rock(f.x+f.face*3,f.y-LEG*0.9,9,1.1);               /* legs */
-    rock((hip.x+sh.x)/2,(hip.y+sh.y)/2+3,12,2.0);rock(sh.x,sh.y+5,10,2.7);rock(hip.x,hip.y,9,3.4); /* torso */
-    rock(sh.x+f.face*6,sh.y-3,7,4.1);                                                    /* shoulder */
-    rock(f.hR.x,f.hR.y,8,5.2);rock(f.hL.x,f.hL.y,7,6.0);                              /* fists */
-    ctx.beginPath();ctx.arc(hd.x,hd.y-2,10,Math.PI*1.05,Math.PI*1.95);ctx.fillStyle='#6b4a2a';ctx.fill();ctx.strokeStyle='#2e1d10';ctx.lineWidth=1.6;ctx.stroke(); /* helmet */
-    ctx.shadowColor='#ff8a2a';ctx.shadowBlur=8;ctx.fillStyle='#ffb04a';                  /* glowing eyes */
-    ctx.fillRect(hd.x+f.face*1,hd.y-2.5,2.4,2.4);ctx.fillRect(hd.x+f.face*5,hd.y-2.5,2.4,2.4);
+    // First draw a continuous, clearly readable giant silhouette; armor plates sit on top.
+    limb({x:hip.x-5*SC,y:hip.y+2},{x:kneeL.x,y:kneeL.y},13*SC);
+    limb({x:kneeL.x,y:kneeL.y},footL,12*SC);
+    limb({x:hip.x+5*SC,y:hip.y+2},{x:kneeR.x,y:kneeR.y},13*SC);
+    limb({x:kneeR.x,y:kneeR.y},footR,12*SC);
+    rock(footL.x,footL.y,10*SC,1.9);rock(footR.x,footR.y,10*SC,2.9);
+    // Wide torso and shoulder mantle
+    ctx.beginPath();ctx.moveTo(sh.x-15*SC,sh.y+3*SC);ctx.lineTo(sh.x+15*SC,sh.y+3*SC);
+    ctx.lineTo(hip.x+10*SC,hip.y+5*SC);ctx.lineTo(hip.x-10*SC,hip.y+5*SC);ctx.closePath();
+    ctx.fillStyle='#795735';ctx.fill();ctx.strokeStyle='#302014';ctx.lineWidth=2.5*SC;ctx.stroke();
+    // Arms extend visibly from shoulders to hands, with large fists at their ends.
+    const shL={x:sh.x-f.face*9*SC,y:sh.y+4*SC},shR={x:sh.x+f.face*9*SC,y:sh.y+4*SC};
+    const elL={x:shL.x+(armL.x-shL.x)*.56,y:shL.y+(armL.y-shL.y)*.56+5*SC};
+    const elR={x:shR.x+(armR.x-shR.x)*.56,y:shR.y+(armR.y-shR.y)*.56+5*SC};
+    limb(shL,elL,11*SC);limb(elL,armL,10*SC);limb(shR,elR,11*SC);limb(elR,armR,10*SC);
+    rock(elL.x,elL.y,8*SC,2.3);rock(elR.x,elR.y,8*SC,3.3);
+    // Layered chest and shoulder stones
+    rock(hip.x,hip.y+2*SC,14*SC,2.4);rock(sh.x,sh.y+5*SC,16*SC,2.7);
+    rock(sh.x-f.face*10*SC,sh.y+3*SC,13*SC,3.8);rock(sh.x+f.face*12*SC,sh.y+4*SC,13*SC,4.8);
+    rock(f.x-4*SC,(hip.y+sh.y)/2,11*SC,1.4);rock(f.x+5*SC,(hip.y+sh.y)/2,11*SC,2.0);
+    // Knee and shin plates preserve the shape of both legs instead of one pillar-like mass.
+    rock(kneeL.x,kneeL.y,10*SC,1.1);rock(kneeR.x,kneeR.y,10*SC,2.1);
+    rock(f.x-5*SC,f.y-13*SC,9*SC,1.7);rock(f.x+5*SC,f.y-13*SC,9*SC,2.7);
+    // Oversized gauntlets clearly show both hands.
+    rock(armL.x,armL.y,10*SC,5.2);rock(armR.x,armR.y,10*SC,6.0);
+    // Directional stone head: brow ridge, forward jaw and a clearly front-facing gaze.
+    const face=f.face||1,headY=hd.y-2*SC;
+    ctx.beginPath();ctx.arc(hd.x,headY,12*SC,0,Math.PI*2);ctx.fillStyle='#806044';ctx.fill();ctx.strokeStyle='#302014';ctx.lineWidth=2.5*SC;ctx.stroke();
+    // Heavy brow and projecting cheek/jaw make the face read as a charging golem.
+    rock(hd.x+face*3*SC,headY-5*SC,6.2*SC,1.1);
+    rock(hd.x+face*6.5*SC,headY+4*SC,5.6*SC,2.4);
+    ctx.beginPath();ctx.moveTo(hd.x-face*3*SC,headY-3*SC);ctx.lineTo(hd.x+face*8*SC,headY-4*SC);ctx.lineTo(hd.x+face*10*SC,headY+1*SC);ctx.lineTo(hd.x+face*2*SC,headY+2*SC);ctx.closePath();ctx.fillStyle='#251a13';ctx.fill();
+    // Glowing eye slit sits on the opponent-facing side; the paired glints angle forward.
+    ctx.shadowColor='#ff9c36';ctx.shadowBlur=6*SC;ctx.fillStyle='#ffd06a';
+    ctx.beginPath();ctx.ellipse(hd.x+face*4.5*SC,headY-1.5*SC,3.2*SC,1.45*SC,face*0.18,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(hd.x+face*8*SC,headY-1*SC,1.6*SC,1.2*SC,0,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
     ctx.restore();
   }
   function drawShield(f){
@@ -7115,7 +7458,7 @@ function startBodyClash(mpMatchId,mpRole){
       ctx.fillStyle='#fff';ctx.font='11px sans-serif';}
     ctx.textAlign='center';ctx.font='bold 13px sans-serif';ctx.fillStyle='#ffd894';
     ctx.fillText('ROUND '+round+'   '+wins1+' - '+wins2,W/2,24);
-    if(gstate==='fight'||gstate==='countdown')ctx.fillText(Math.ceil(roundTimer)+'s',W/2,42);
+    if(gstate==='fight')ctx.fillText('∞',W/2,42);
   }
   function drawOverlay(){
     ctx.textAlign='center';
@@ -7126,10 +7469,10 @@ function startBodyClash(mpMatchId,mpRole){
       ctx.globalAlpha=0.6+0.4*Math.sin(Date.now()/250);ctx.font='bold 21px sans-serif';ctx.fillStyle='#00e5a0';
       ctx.fillText(online?(isHost?(rnet?'TOUCH ANY STICK TO START':'WAITING FOR OPPONENT…'):'WAITING FOR HOST TO START'):'TOUCH ANY STICK TO START',W/2,H/2+20);ctx.globalAlpha=1;
       ctx.font='13px sans-serif';ctx.fillStyle='#aab';
-      ctx.fillText('Top-left stick: walk / fly  ·  Lower-left: aim & release to cast  ·  Lower-right: dome shield',W/2,H/2+56);
+      ctx.fillText('Top-left OR top-right stick: walk / fly  ·  Lower-left: aim & release to cast  ·  Lower-right: dome shield',W/2,H/2+56);
       ctx.fillText('Reach further with a hand = more power  ·  Pick your element with the corner icon',W/2,H/2+76);
       ctx.fillStyle='#ffd894';
-      ctx.fillText('TOUCH MOVES: ground→up = Earth pillars · sky→down = Lightning · circle = Tornado',W/2,H/2+100);
+      ctx.fillText('TOUCH MOVES: ground→up = draw your own curved Earth root (higher = thicker base + more energy) · sky→down = Lightning · circle = Tornado',W/2,H/2+100);
       ctx.fillText('swipe from yourself = Flamethrower · touch the rival = Freeze',W/2,H/2+120);
       ctx.fillText('HOLD the attack stick ~2 sec, then release = SUPER (Earth = TITAN giant form)',W/2,H/2+140);
     } else if(gstate==='countdown'){
