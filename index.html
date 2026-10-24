@@ -559,7 +559,8 @@ main{max-width:900px;margin:0 auto;padding:16px;}
   #sdWeaponClose{margin-top:14px;width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,180,60,.6);background:rgba(255,180,60,.7);color:#1a1408;font:bold 15px 'Segoe UI',sans-serif;cursor:pointer;}
   #sdManualClose{margin-top:16px;width:100%;padding:10px;border-radius:10px;border:1px solid rgba(180,100,255,.6);background:rgba(160,50,255,.75);color:#fff;font:bold 15px 'Segoe UI',sans-serif;cursor:pointer;}
 
-  #sdPads{position:absolute;left:0;right:0;bottom:0;display:none;justify-content:space-between;align-items:flex-end;padding:10px;box-sizing:border-box;pointer-events:none;z-index:10;}
+  /* controls live in their own panel BELOW the canvas (like Shadow Clash) so fingers never cover the fight */
+  #sdPads{position:relative;margin-top:8px;display:none;justify-content:space-between;align-items:flex-end;padding:10px 8px 8px;box-sizing:border-box;background:rgba(255,255,255,.035);border-top:1px solid rgba(255,255,255,.08);border-radius:12px;z-index:10;}
   @media (pointer:coarse){#sdPads{display:flex}}
   #sdPads.hidden{display:none !important;}
   .sd-pgrp{display:flex;gap:9px;pointer-events:none}
@@ -2860,7 +2861,7 @@ async function saveBestScoreLow(key,score){
 /* -- Character skins (unlock by best score) -- */
 const SKY_SKINS=[{emoji:'🛸',unlock:0},{emoji:'🚀',unlock:5},{emoji:'🦋',unlock:10},{emoji:'🐝',unlock:20},{emoji:'🦅',unlock:35},{emoji:'🐉',unlock:50}];
 const RC_SKINS=[{emoji:'👾',unlock:0},{emoji:'🤖',unlock:100},{emoji:'🐸',unlock:250},{emoji:'🦘',unlock:500},{emoji:'🐰',unlock:800},{emoji:'🦄',unlock:1200}];
-const SNAKE_SKINS=[{emoji:'🐍',unlock:0},{emoji:'🐛',unlock:5},{emoji:'🦎',unlock:12},{emoji:'🐲',unlock:25}];
+const SNAKE_SKINS=[{emoji:'🟢',color:'#2fb85a',unlock:0},{emoji:'🔵',color:'#2f8fe0',unlock:5},{emoji:'🟠',color:'#f08a24',unlock:12},{emoji:'🟣',color:'#9b59d0',unlock:25},{emoji:'🔴',color:'#e0453f',unlock:40},{emoji:'🟡',color:'#e6b800',unlock:60}];
 const RUNNER_SKINS=[{emoji:'🏃',unlock:0},{emoji:'🤸',unlock:15},{emoji:'🥷',unlock:30},{emoji:'🦸',unlock:60},{emoji:'🧟',unlock:100},{emoji:'👻',unlock:150}];
 const SPACE_SKINS=[{emoji:'⚪',color:'#ffffff',unlock:0},{emoji:'🔵',color:'#00b8ff',unlock:150},{emoji:'🟢',color:'#00e676',unlock:400},{emoji:'🟡',color:'#ffd600',unlock:800},{emoji:'🟠',color:'#ff9100',unlock:1500},{emoji:'🔴',color:'#ff4757',unlock:2500},{emoji:'🟣',color:'#9c27b0',unlock:4000}];
 const SKIN_SETS={skySkin:{skins:SKY_SKINS,bestKey:'bestSkyHopper',restart:'startSkyHopper'},rcSkin:{skins:RC_SKINS,bestKey:'bestRocketClimb',restart:'startRocketClimb'},snakeSkin:{skins:SNAKE_SKINS,bestKey:'bestSnake',restart:'startSnakeGame'},runnerSkin:{skins:RUNNER_SKINS,bestKey:'bestRunner',restart:'startRunnerGame'},spaceSkin:{skins:SPACE_SKINS,bestKey:'bestSpaceSurvival',restart:'startSpaceSurvival'}};
@@ -2944,10 +2945,7 @@ function showGameMenu(){
   document.getElementById('gameBackBtn').style.display='none';
   document.getElementById('gameHeadTitle').textContent='🎮 Mini Games';
   document.getElementById('gameBody').innerHTML=`
-    <div class="game-menu-row">
-      <button class="game-menu-btn" onclick="startTicTacToe()"><span class="game-menu-icon">⭕</span><div><div>Tic Tac Toe</div><div class="game-menu-desc">Classic X vs O against the computer</div></div></button>
-      <button class="game-online-btn" onclick="openInvitePlayer('tictactoe')" title="Play a friend online">👥</button>
-    </div>
+    <button class="game-menu-btn" onclick="openGameModes('tictactoe')"><span class="game-menu-icon">⭕</span><div><div>Tic Tac Toe</div><div class="game-menu-desc">X vs O — play the computer, a friend on this phone, or online</div></div></button>
     <button class="game-menu-btn" onclick="startRunnerGame()"><span class="game-menu-icon">🏃</span><div><div>Lane Dash</div><div class="game-menu-desc">Endless runner — dodge, jump and slide past obstacles</div></div></button>
     <button class="game-menu-btn" onclick="startSkyHopper()"><span class="game-menu-icon">🛸</span><div><div>Sky Hopper</div><div class="game-menu-desc">Tap to fly through the gates without crashing</div></div></button>
     <button class="game-menu-btn" onclick="startRocketClimb()"><span class="game-menu-icon">👾</span><div><div>Rocket Climb</div><div class="game-menu-desc">Bounce your bot upward as high as you can</div></div></button>
@@ -2965,10 +2963,7 @@ function showGameMenu(){
       <button class="game-menu-btn" onclick="startShadowDuel()"><span class="game-menu-icon">⚔️</span><div><div>Shadow Duel</div><div class="game-menu-desc">Full combo fighter — weapons, custom combos and a special meter</div></div></button>
       <button class="game-online-btn" onclick="openInvitePlayer('shadowduel')" title="Play a friend online">👥</button>
     </div>
-    <div class="game-menu-row">
-      <button class="game-menu-btn" onclick="startChessGame()"><span class="game-menu-icon">♟️</span><div><div>Chess</div><div class="game-menu-desc">Play the computer at Easy, Medium, Hard or Extreme</div></div></button>
-      <button class="game-online-btn" onclick="openInvitePlayer('chess')" title="Play a friend online">👥</button>
-    </div>
+    <button class="game-menu-btn" onclick="openGameModes('chess')"><span class="game-menu-icon">♟️</span><div><div>Chess</div><div class="game-menu-desc">Play the computer, a friend on this phone, or online</div></div></button>
     <div class="game-menu-row">
       <button class="game-menu-btn" onclick="startTankGame()"><span class="game-menu-icon">🪖</span><div><div>Tank Battle</div><div class="game-menu-desc">Top-down tank fight — two joysticks, reload time, tall walls block your barrel</div></div></button>
       <button class="game-online-btn" onclick="openInvitePlayer('tankbattle')" title="Play a friend online">👥</button>
@@ -2976,25 +2971,43 @@ function showGameMenu(){
   `;
 }
 
+/* -- Mode picker for 2-player games: vs Computer · Pass & Play (one phone) · Online -- */
+function openGameModes(game){
+  stopGameLoop();
+  const g={tictactoe:{title:'⭕ Tic Tac Toe',cpu:'startTicTacToe()',local:'startTicTacToe(true)'},chess:{title:'♟️ Chess',cpu:'startChessGame()',local:'startChessGame(true)'}}[game];
+  if(!g)return;
+  document.getElementById('gameBackBtn').style.display='';
+  document.getElementById('gameHeadTitle').textContent=g.title;
+  document.getElementById('gameBody').innerHTML=`
+    <div style="font-size:0.8em;color:var(--text3);margin-bottom:8px;">How do you want to play?</div>
+    <button class="game-menu-btn" onclick="${g.cpu}"><span class="game-menu-icon">🤖</span><div><div>vs Computer</div><div class="game-menu-desc">Play alone against the computer</div></div></button>
+    <button class="game-menu-btn" onclick="${g.local}"><span class="game-menu-icon">🤝</span><div><div>Pass &amp; Play</div><div class="game-menu-desc">Two players, one phone — take turns on the same screen</div></div></button>
+    <button class="game-menu-btn" onclick="openInvitePlayer('${game}')"><span class="game-menu-icon">🌐</span><div><div>Online Friend</div><div class="game-menu-desc">Invite a friend to play on their own phone</div></div></button>`;
+}
+window.openGameModes=openGameModes;
+
 /* -- Tic Tac Toe (with unbeatable AI) -- */
-let tttBoard=[],tttOver=false;
-function startTicTacToe(){
+let tttBoard=[],tttOver=false,tttLocal=false,tttTurn='X',tttTally={x:0,o:0,d:0};
+function startTicTacToe(local,keepTally){
   stopGameLoop();
   document.getElementById('gameBackBtn').style.display='';
   document.getElementById('gameHeadTitle').textContent='⭕ Tic Tac Toe';
-  tttBoard=Array(9).fill('');tttOver=false;
-  renderTttBoard('Your turn (X)');
+  tttLocal=!!local;if(!tttLocal||!keepTally)tttTally={x:0,o:0,d:0};
+  tttBoard=Array(9).fill('');tttOver=false;tttTurn='X';
+  renderTttBoard(tttLocal?"Player 1's turn (X)":'Your turn (X)');
 }
 function renderTttBoard(status){
   document.getElementById('gameBody').innerHTML=`
     <div class="game-canvas-wrap">
       <div class="ttt-board">${tttBoard.map((v,i)=>`<button class="ttt-cell ${v==='O'?'o':''}" ${v||tttOver?'disabled':''} onclick="tttMove(${i})">${v}</button>`).join('')}</div>
       <div class="game-score">${status}</div>
-      <button class="btn-cancel" onclick="startTicTacToe()">🔄 Restart</button>
+      ${tttLocal?`<div style="font-size:0.78em;color:var(--text3);">Player 1 (X): ${tttTally.x} · Player 2 (O): ${tttTally.o} · Draws: ${tttTally.d}</div>`:''}
+      <button class="btn-cancel" onclick="startTicTacToe(tttLocal,true)">${tttLocal?'🔄 Next round':'🔄 Restart'}</button>
     </div>`;
 }
 function tttMove(i){
   if(tttBoard[i]||tttOver)return;
+  if(tttLocal){tttBoard[i]=tttTurn;tttTurn=tttTurn==='X'?'O':'X';tttCheckEnd();return;}   // Pass & Play: players alternate
   tttBoard[i]='X';
   if(tttCheckEnd())return;
   const m=tttBestMove();
@@ -3003,9 +3016,14 @@ function tttMove(i){
 }
 function tttCheckEnd(){
   const w=tttWinnerOf(tttBoard);
-  if(w){tttOver=true;renderTttBoard(w==='X'?'🎉 You win!':'🤖 Computer wins!');return true;}
-  if(tttBoard.every(c=>c)){tttOver=true;renderTttBoard("🤝 It's a draw!");return true;}
-  renderTttBoard('Your turn (X)');
+  if(w){
+    tttOver=true;
+    if(tttLocal){tttTally[w==='X'?'x':'o']++;renderTttBoard(w==='X'?'🎉 Player 1 (X) wins!':'🎉 Player 2 (O) wins!');}
+    else renderTttBoard(w==='X'?'🎉 You win!':'🤖 Computer wins!');
+    return true;
+  }
+  if(tttBoard.every(c=>c)){tttOver=true;if(tttLocal)tttTally.d++;renderTttBoard("🤝 It's a draw!");return true;}
+  renderTttBoard(tttLocal?(tttTurn==='X'?"Player 1's turn (X)":"Player 2's turn (O)"):'Your turn (X)');
   return false;
 }
 function tttWinnerOf(b){
@@ -3209,8 +3227,9 @@ function startRunnerGame(){
   const W=canvas.width,H=canvas.height;
   const laneX=[W*0.2,W*0.5,W*0.8];
   const playerY=H-70;
+  const LANE_GAP=laneX[1]-laneX[0],HIT_X=LANE_GAP*0.33,LANE_FRAMES=10;   // a lane change takes ~10 frames; you collide where you really are
   function reset(){
-    runner={lane:1,jumping:false,jumpT:0,sliding:false,slideT:0,obstacles:[],coins:[],score:0,speed:3,over:false,started:false,saved:false,spawnTimer:0};
+    runner={lane:1,x:laneX[1],jumping:false,jumpT:0,sliding:false,slideT:0,obstacles:[],coins:[],score:0,speed:3,over:false,started:false,saved:false,spawnTimer:0};
   }
   reset();
   function jump(){if(runner.over){reset();return;}runner.started=true;if(!runner.jumping&&!runner.sliding){runner.jumping=true;runner.jumpT=0;}}
@@ -3247,6 +3266,8 @@ function startRunnerGame(){
     ctx.strokeStyle='rgba(255,255,255,0.08)';
     ctx.beginPath();ctx.moveTo(W/3,0);ctx.lineTo(W/3,H);ctx.moveTo(W*2/3,0);ctx.lineTo(W*2/3,H);ctx.stroke();
     if(runner.started&&!runner.over){
+      const stepX=LANE_GAP/LANE_FRAMES;                                  // glide toward the chosen lane instead of jumping there
+      runner.x+=Math.max(-stepX,Math.min(stepX,laneX[runner.lane]-runner.x));
       runner.speed=Math.min(9,3+runner.score*0.02);
       runner.spawnTimer++;
       if(runner.spawnTimer>Math.max(35,60-runner.speed*3)){
@@ -3264,14 +3285,14 @@ function startRunnerGame(){
       if(runner.sliding){runner.slideT++;if(runner.slideT>34)runner.sliding=false;}
       runner.obstacles.forEach(o=>{
         if(!o.passed&&o.y>playerY+20){o.passed=true;runner.score+=1;}
-        if(Math.abs(o.y-playerY)<26&&o.lane===runner.lane){
+        if(Math.abs(o.y-playerY)<26&&Math.abs(laneX[o.lane]-runner.x)<HIT_X){
           if(o.type==='jump'&&runner.jumping)return;
           if(o.type==='duck'&&runner.sliding)return;
           runner.over=true;
         }
       });
       runner.coins.forEach(c=>{
-        if(!c.collected&&Math.abs(c.y-playerY)<26&&c.lane===runner.lane){c.collected=true;runner.score+=5;}
+        if(!c.collected&&Math.abs(c.y-playerY)<26&&Math.abs(laneX[c.lane]-runner.x)<HIT_X){c.collected=true;runner.score+=5;}
       });
     }
     if(runner.over&&!runner.saved){
@@ -3287,8 +3308,21 @@ function startRunnerGame(){
     });
     let py=playerY;
     if(runner.jumping)py-=26*Math.sin(Math.PI*runner.jumpT/34);
+    // lane-change look: a little forward lift and a lean toward the new lane (0 when standing in a lane)
+    const phase=(Math.abs(runner.x-laneX[0])%LANE_GAP)/LANE_GAP;
+    const lift=Math.sin(Math.PI*phase);
+    const toGo=laneX[runner.lane]-runner.x;
+    const tilt=Math.max(-1,Math.min(1,toGo/LANE_GAP))*0.35;
+    const by=(runner.sliding?py+10:py+12)-lift*10,cy=by-10;
     ctx.font=runner.sliding?'26px sans-serif':'34px sans-serif';
-    ctx.fillText(emoji,laneX[runner.lane]-(runner.sliding?13:17),runner.sliding?py+10:py+12);
+    if(Math.abs(toGo)>1){                                                // faint trail behind while moving sideways
+      ctx.save();ctx.globalAlpha=0.22;
+      ctx.fillText(emoji,runner.x-(toGo>0?1:-1)*12-(runner.sliding?13:17),by);
+      ctx.restore();
+    }
+    ctx.save();ctx.translate(runner.x,cy);ctx.rotate(tilt);
+    ctx.fillText(emoji,-(runner.sliding?13:17),by-cy);
+    ctx.restore();
     document.getElementById('runnerScore').textContent=runner.over?'Score: '+runner.score+' — Game Over, tap to retry':(runner.started?'Score: '+runner.score:'Score: 0 — tap to start');
     gameLoopId=requestAnimationFrame(loop);
   }
@@ -3302,7 +3336,7 @@ function startSnakeGame(){
   document.getElementById('gameBackBtn').style.display='';
   document.getElementById('gameHeadTitle').textContent='🐍 Snake';
   const best=getBestScore('bestSnake');
-  const emoji=getSkinEmoji('snakeSkin',SNAKE_SKINS);
+  const bodyColor=getSkinColor('snakeSkin',SNAKE_SKINS);
   document.getElementById('gameBody').innerHTML=`
     <div class="game-canvas-wrap">
       <canvas id="snakeCanvas" width="280" height="280"></canvas>
@@ -3326,11 +3360,15 @@ function startSnakeGame(){
     return f;
   }
   function reset(){
-    snake={body:[{x:6,y:7},{x:5,y:7},{x:4,y:7}],dir:{x:1,y:0},nextDir:{x:1,y:0},score:0,over:false,saved:false,speed:150,acc:0};
+    snake={body:[{x:6,y:7},{x:5,y:7},{x:4,y:7}],dir:{x:1,y:0},queue:[],prev:null,ang:0,score:0,over:false,saved:false,speed:150,acc:0};
     snake.food=randFood(snake.body);
   }
   reset();
-  function setDir(x,y){if(snake.dir.x===-x&&snake.dir.y===-y)return;snake.nextDir={x,y};}
+  function setDir(x,y){                                                // keeps up to 2 quick turns so fast swipes are not lost
+    const last=snake.queue.length?snake.queue[snake.queue.length-1]:snake.dir;
+    if((last.x===x&&last.y===y)||(last.x===-x&&last.y===-y))return;
+    if(snake.queue.length<2)snake.queue.push({x,y});
+  }
   document.getElementById('snUp').addEventListener('pointerdown',()=>setDir(0,-1));
   document.getElementById('snDown').addEventListener('pointerdown',()=>setDir(0,1));
   document.getElementById('snLeft').addEventListener('pointerdown',()=>setDir(-1,0));
@@ -3351,7 +3389,8 @@ function startSnakeGame(){
       snake.acc+=dt;
       if(snake.acc>snake.speed){
         snake.acc=0;
-        snake.dir=snake.nextDir;
+        if(snake.queue.length)snake.dir=snake.queue.shift();
+        const oldBody=snake.body.map(s=>({x:s.x,y:s.y}));
         const head={x:snake.body[0].x+snake.dir.x,y:snake.body[0].y+snake.dir.y};
         if(head.x<0||head.x>=cols||head.y<0||head.y>=rows||snake.body.some(s=>s.x===head.x&&s.y===head.y)){
           snake.over=true;
@@ -3364,6 +3403,7 @@ function startSnakeGame(){
           }else{
             snake.body.pop();
           }
+          snake.prev=snake.body.map((s,i)=>oldBody[i]||oldBody[oldBody.length-1]);   // where each segment was one step ago
         }
       }
     }
@@ -3373,7 +3413,41 @@ function startSnakeGame(){
     }
     ctx.font=(cell-2)+'px sans-serif';
     ctx.fillText('🍎',snake.food.x*cell,snake.food.y*cell+cell-3);
-    snake.body.forEach((s,i)=>ctx.fillText(i===0?emoji:'🟢',s.x*cell,s.y*cell+cell-3));
+    // smooth drawing: every segment slides from its old cell to its new cell during the step
+    const t=snake.over?1:Math.min(1,snake.acc/snake.speed);
+    const pts=snake.body.map((sg,i)=>{const pv=(snake.prev&&snake.prev[i])||sg;return {x:(pv.x+(sg.x-pv.x)*t)*cell+cell/2,y:(pv.y+(sg.y-pv.y)*t)*cell+cell/2};});
+    ctx.save();
+    ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+    ctx.strokeStyle='rgba(0,0,0,0.30)';ctx.lineWidth=cell-2;ctx.stroke();       // dark outline
+    ctx.strokeStyle=bodyColor;ctx.lineWidth=cell-5;ctx.stroke();                 // body (your chosen colour)
+    ctx.strokeStyle='rgba(255,255,255,0.22)';ctx.lineWidth=5;ctx.stroke();       // soft highlight along the back
+    ctx.restore();
+    // head: drawn by hand, turns smoothly toward the direction of travel
+    let da=Math.atan2(snake.dir.y,snake.dir.x)-snake.ang;da=Math.atan2(Math.sin(da),Math.cos(da));
+    snake.ang+=da*0.35;
+    ctx.save();ctx.translate(pts[0].x,pts[0].y);ctx.rotate(snake.ang);
+    const tl=snake.over?0:Math.max(0,Math.sin(now/260))*7;                       // tongue flicks in and out
+    if(tl>0.6){
+      ctx.strokeStyle='#e8334a';ctx.lineWidth=1.6;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(9,0);ctx.lineTo(10+tl,0);ctx.moveTo(10+tl,0);ctx.lineTo(13+tl,-2.5);ctx.moveTo(10+tl,0);ctx.lineTo(13+tl,2.5);ctx.stroke();
+    }
+    ctx.beginPath();ctx.ellipse(1,0,11,9.5,0,0,Math.PI*2);
+    ctx.fillStyle=bodyColor;ctx.fill();ctx.strokeStyle='rgba(0,0,0,0.32)';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.beginPath();ctx.ellipse(0,-3.4,6.5,2.8,0,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.20)';ctx.fill();   // shine
+    ctx.fillStyle='rgba(0,0,0,0.35)';                                              // nostrils
+    ctx.beginPath();ctx.arc(9,-2.3,0.9,0,Math.PI*2);ctx.arc(9,2.3,0.9,0,Math.PI*2);ctx.fill();
+    for(const ey of [-5,5]){                                                       // eyes
+      if(snake.over){                                                              // dead: X eyes
+        ctx.strokeStyle='#111';ctx.lineWidth=1.5;ctx.beginPath();
+        ctx.moveTo(2,ey-2.4);ctx.lineTo(6.4,ey+2.4);ctx.moveTo(6.4,ey-2.4);ctx.lineTo(2,ey+2.4);ctx.stroke();
+      }else{
+        ctx.beginPath();ctx.arc(4,ey,3.3,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
+        ctx.strokeStyle='rgba(0,0,0,0.35)';ctx.lineWidth=0.8;ctx.stroke();
+        ctx.beginPath();ctx.arc(5.2,ey,1.7,0,Math.PI*2);ctx.fillStyle='#111';ctx.fill();
+      }
+    }
+    ctx.restore();
     document.getElementById('snakeScore').textContent=snake.over?'Score: '+snake.score+' — Game Over, tap to retry':'Score: '+snake.score;
     gameLoopId=requestAnimationFrame(loop);
   }
@@ -3855,12 +3929,13 @@ function chessMoveTickerText(lastMove,moverLabel){
   if(!lastMove||!lastMove.piece)return '';
   return (moverLabel?moverLabel+': ':'')+(CHESS_PIECE_NAMES[lastMove.piece[1]]||'')+' → '+chessSqName(lastMove.toR,lastMove.toC);
 }
-let chessState=null,chessSelected=null,chessLegalForSel=[],chessDifficulty='medium',chessThinking=false,chessOver=false,chessLastMove=null;
-function startChessGame(){
+let chessState=null,chessSelected=null,chessLegalForSel=[],chessDifficulty='medium',chessThinking=false,chessOver=false,chessLastMove=null,chessLocal=false,chessLocalFlip=false;
+function startChessGame(local){
   stopGameLoop();
   document.getElementById('gameBackBtn').style.display='';
   document.getElementById('gameHeadTitle').textContent='♟️ Chess';
   chessDifficulty=localStorage.getItem('chessDifficulty')||'medium';
+  chessLocal=!!local;chessLocalFlip=false;
   chessResetGame();
   renderChessScreen();
 }
@@ -3868,12 +3943,45 @@ function chessResetGame(){
   chessState={board:chessInitBoard(),turn:'w',castling:{wK:true,wQ:true,bK:true,bQ:true},enPassant:null,capturedLog:[]};
   chessSelected=null;chessLegalForSel=[];chessThinking=false;chessOver=false;chessLastMove=null;
 }
+/* -- Chess move animation: the piece glides from its old square to the new one (no teleport) -- */
+function chessAnimateMove(mv){
+  const board=document.getElementById('chessBoard');
+  if(!mv||!board||!board.animate)return;
+  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const sq=(r,c)=>board.querySelector('.chess-sq[data-r="'+r+'"][data-c="'+c+'"]');
+  const slide=(fr,fc,tr,tc)=>{
+    const a=sq(fr,fc),b=sq(tr,tc);if(!a||!b)return;
+    const piece=b.querySelector('.chess-piece');if(!piece)return;
+    const dx=a.offsetLeft-b.offsetLeft,dy=a.offsetTop-b.offsetTop;   // distance from the new square back to the old one
+    piece.style.position='relative';piece.style.zIndex='20';
+    const an=piece.animate([{transform:'translate('+dx+'px,'+dy+'px) scale(1.12)'},{transform:'translate(0,0) scale(1)'}],{duration:240,easing:'cubic-bezier(.25,.8,.3,1)'});
+    const done=()=>{piece.style.position='';piece.style.zIndex='';};
+    an.onfinish=done;an.oncancel=done;
+  };
+  slide(mv.fromR,mv.fromC,mv.toR,mv.toC);
+  if(mv.piece&&mv.piece[1]==='K'&&Math.abs(mv.toC-mv.fromC)===2){   // castling: the rook slides as well
+    const kingSide=mv.toC>mv.fromC;
+    slide(mv.fromR,kingSide?7:0,mv.toR,kingSide?5:3);
+  }
+  if(mv.cap){                                                       // the captured piece fades out where it stood
+    const host=sq(mv.ep?mv.fromR:mv.toR,mv.toC);
+    if(host){
+      const g=document.createElement('span');
+      g.className='chess-piece '+(mv.cap[0]==='w'?'white-piece':'black-piece');
+      g.textContent=CHESS_GLYPHS[mv.cap]||'';
+      g.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:10;';
+      host.appendChild(g);
+      const an=g.animate([{opacity:1,transform:'scale(1)'},{opacity:1,transform:'scale(1)',offset:.6},{opacity:0,transform:'scale(.5)'}],{duration:340,easing:'ease-out'});
+      an.onfinish=an.oncancel=()=>g.remove();
+    }
+  }
+}
 function renderChessScreen(){
   const diffs=['easy','medium','hard','extreme'];
   const diffLabels={easy:'Easy',medium:'Medium',hard:'Hard',extreme:'Extreme'};
   document.getElementById('gameBody').innerHTML=`
     <div class="game-canvas-wrap">
-      <div class="skin-row">${diffs.map(d=>`<button class="skin-btn ${d===chessDifficulty?'selected':''}" style="width:auto;padding:0 10px;font-size:0.72em;font-weight:700;" onclick="chessSetDifficulty('${d}')">${diffLabels[d]}</button>`).join('')}</div>
+      <div class="skin-row">${chessLocal?'<button class="skin-btn" style="width:auto;padding:0 10px;font-size:0.72em;font-weight:700;" onclick="chessToggleLocalFlip()">🔄 Flip board</button>':diffs.map(d=>`<button class="skin-btn ${d===chessDifficulty?'selected':''}" style="width:auto;padding:0 10px;font-size:0.72em;font-weight:700;" onclick="chessSetDifficulty('${d}')">${diffLabels[d]}</button>`).join('')}</div>
       <div class="game-score" id="chessStatus">White to move</div>
       <div class="captured-row" id="capturedTop"></div>
       <div class="chess-board-wrap">
@@ -3896,8 +4004,9 @@ function renderChessBoard(){
   if(!el)return;
   let html='';
   const kingPos=chessInCheck(chessState,chessState.turn)?chessFindKing(chessState,chessState.turn):null;
-  for(let r=0;r<8;r++){
-    for(let c=0;c<8;c++){
+  const order=chessLocalFlip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
+  for(const r of order){
+    for(const c of order){
       const p=chessState.board[r][c];
       const isLight=(r+c)%2===0;
       const isSel=chessSelected&&chessSelected[0]===r&&chessSelected[1]===c;
@@ -3908,7 +4017,7 @@ function renderChessBoard(){
       if(isLastMove)cls+=' last-move';
       if(isSel)cls+=' selected';
       if(isCheck)cls+=' incheck';
-      html+=`<div class="${cls}" onclick="chessSquareClick(${r},${c})">`;
+      html+=`<div class="${cls}" data-r="${r}" data-c="${c}" onclick="chessSquareClick(${r},${c})">`;
       if(p)html+=`<span class="chess-piece ${p[0]==='w'?'white-piece':'black-piece'}">${CHESS_GLYPHS[p]}</span>`;
       if(legalMove)html+=`<span class="chess-dot${p?' capture':''}"></span>`;
       html+='</div>';
@@ -3918,13 +4027,13 @@ function renderChessBoard(){
   const ct=document.getElementById('capturedTop');if(ct)ct.innerHTML='⚔️ '+chessCapturedRowHtml(chessState.capturedLog,'b');
   const cb=document.getElementById('capturedBottom');if(cb)cb.innerHTML='⚔️ '+chessCapturedRowHtml(chessState.capturedLog,'w');
   const ticker=document.getElementById('chessMoveTicker');
-  if(ticker)ticker.textContent=chessMoveTickerText(chessLastMove,chessLastMove&&chessLastMove.piece&&chessLastMove.piece[0]==='b'?'Computer':'You');
+  if(ticker){const pc=chessLastMove&&chessLastMove.piece;ticker.textContent=chessMoveTickerText(chessLastMove,pc?(chessLocal?(pc[0]==='b'?'Black':'White'):(pc[0]==='b'?'Computer':'You')):'');}
   const statusEl=document.getElementById('chessStatus');
   if(!statusEl)return;
   if(chessThinking){statusEl.textContent='🤔 Computer is thinking...';return;}
   const status=chessGameStatus(chessState);
-  if(status==='whiteWins'){statusEl.textContent='🎉 Checkmate — You win!';chessOver=true;}
-  else if(status==='blackWins'){statusEl.textContent='😢 Checkmate — Computer wins!';chessOver=true;}
+  if(status==='whiteWins'){statusEl.textContent=chessLocal?'🎉 Checkmate — White wins!':'🎉 Checkmate — You win!';chessOver=true;}
+  else if(status==='blackWins'){statusEl.textContent=chessLocal?'🎉 Checkmate — Black wins!':'😢 Checkmate — Computer wins!';chessOver=true;}
   else if(status==='stalemate'){statusEl.textContent='🤝 Stalemate — Draw!';chessOver=true;}
   else{
     const inCheck=chessInCheck(chessState,chessState.turn);
@@ -3933,27 +4042,32 @@ function renderChessBoard(){
     chessOver=false;
   }
 }
+function chessToggleLocalFlip(){chessLocalFlip=!chessLocalFlip;renderChessBoard();}
+window.chessToggleLocalFlip=chessToggleLocalFlip;
 function chessSquareClick(r,c){
-  if(chessThinking||chessOver||chessState.turn!=='w')return;
+  if(chessThinking||chessOver)return;
+  const me=chessLocal?chessState.turn:'w';              // Pass & Play: whoever's turn it is can move
+  if(chessState.turn!==me)return;
   const p=chessState.board[r][c];
   if(chessSelected){
     const move=chessLegalForSel.find(m=>m.toR===r&&m.toC===c);
     if(move){
       chessMakeMove(chessState,move);
-      chessLastMove={fromR:move.fromR,fromC:move.fromC,toR:move.toR,toC:move.toC,piece:move.piece};
+      chessLastMove={fromR:move.fromR,fromC:move.fromC,toR:move.toR,toC:move.toC,piece:move.piece,cap:move.captured||null,ep:!!move.isEnPassant};
       chessSelected=null;chessLegalForSel=[];
       renderChessBoard();
+      chessAnimateMove(chessLastMove);
       const status=chessGameStatus(chessState);
-      if(status==='ongoing')setTimeout(chessAiTurn,300);
+      if(status==='ongoing'&&!chessLocal)setTimeout(chessAiTurn,300);
       return;
     }
-    if(p&&p[0]==='w'){
+    if(p&&p[0]===me){
       chessSelected=[r,c];
-      chessLegalForSel=chessLegalMoves(chessState,'w').filter(m=>m.fromR===r&&m.fromC===c);
+      chessLegalForSel=chessLegalMoves(chessState,me).filter(m=>m.fromR===r&&m.fromC===c);
     }else{chessSelected=null;chessLegalForSel=[];}
-  }else if(p&&p[0]==='w'){
+  }else if(p&&p[0]===me){
     chessSelected=[r,c];
-    chessLegalForSel=chessLegalMoves(chessState,'w').filter(m=>m.fromR===r&&m.fromC===c);
+    chessLegalForSel=chessLegalMoves(chessState,me).filter(m=>m.fromR===r&&m.fromC===c);
   }
   renderChessBoard();
 }
@@ -3968,6 +4082,7 @@ function chessAiTurn(){
     }
     chessThinking=false;
     renderChessBoard();
+    if(move)chessAnimateMove(chessLastMove);
   },50);
 }
 
@@ -8359,12 +8474,13 @@ async function onlineTttMove(i){
 }
 
 /* -- Online Chess -- */
-let chessBoardFlipped=false;
+let chessBoardFlipped=false,onlineChessSeenKey;
 function startOnlineChess(matchId,role){
   document.getElementById('gameBackBtn').style.display='';
   document.getElementById('gameHeadTitle').textContent='♟️ Online Chess';
   chessSelected=null;chessLegalForSel=[];
   chessBoardFlipped=(role==='p2');
+  onlineChessSeenKey=undefined;
   const {doc,onSnapshot}=window._fbFns;
   if(onlineChessUnsub)onlineChessUnsub();
   onlineChessUnsub=onSnapshot(doc(window._db,'matches',matchId),snap=>{
@@ -8411,6 +8527,9 @@ function renderOnlineChess(role){
       </div>
     </div>`;
   renderOnlineChessBoard(state,myColor,m.status,m.lastMove);
+  const seenKey=m.lastMove?JSON.stringify(m.lastMove):'none';        // animate only when a NEW move arrived (not on board flip / re-render)
+  if(onlineChessSeenKey!==undefined&&seenKey!==onlineChessSeenKey&&m.lastMove)chessAnimateMove(m.lastMove);
+  onlineChessSeenKey=seenKey;
 }
 function renderOnlineChessBoard(state,myColor,matchStatus,lastMove){
   const el=document.getElementById('chessBoard');
@@ -8430,7 +8549,7 @@ function renderOnlineChessBoard(state,myColor,matchStatus,lastMove){
       if(isLastMove)cls+=' last-move';
       if(isSel)cls+=' selected';
       if(isCheck)cls+=' incheck';
-      html+=`<div class="${cls}" onclick="onlineChessSquareClick(${r},${c})">`;
+      html+=`<div class="${cls}" data-r="${r}" data-c="${c}" onclick="onlineChessSquareClick(${r},${c})">`;
       if(p)html+=`<span class="chess-piece ${p[0]==='w'?'white-piece':'black-piece'}">${CHESS_GLYPHS[p]}</span>`;
       if(legalMove)html+=`<span class="chess-dot${p?' capture':''}"></span>`;
       html+='</div>';
