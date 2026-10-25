@@ -532,6 +532,20 @@ main{max-width:900px;margin:0 auto;padding:16px;}
 .ttt-board{gap:8px;max-width:none;}
 .ttt-cell{font-size:clamp(2.2em,15vw,4.4em);border-radius:12px;}
 .captured-row{width:min(100%,640px);max-width:none;font-size:1.1em;}
+/* chess board: sized from the screen width (valid in every browser, so it can never collapse into a small rectangle).
+   If the screen is short the page simply scrolls down a little. */
+:root{--vh:100vh;--cbw:min(calc(100vw - 16px),640px,max(calc(var(--vh) - 210px),320px));}
+@supports (height:1dvh){:root{--vh:100dvh;}}
+.chess-screen{flex:none !important;}
+.chess-board-wrap{flex:none;min-height:0;container-type:normal;width:100%;}
+.chess-board{flex:none;width:var(--cbw);height:var(--cbw);aspect-ratio:1/1;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);box-sizing:border-box;}
+.chess-sq{font-size:calc(var(--cbw) / 8 * 0.74);}
+.captured-row{width:var(--cbw);max-width:100%;}
+.pause-banner{font-size:0.8em;border-radius:10px;padding:8px 12px;text-align:center;max-width:var(--cbw,420px);background:var(--surface2);border:1px solid var(--border);color:var(--text2);}
+.pause-banner span{display:block;font-weight:400;font-size:0.92em;color:var(--text3);margin-top:3px;}
+.pause-banner.ask{border-color:#ffb800;background:rgba(255,184,0,0.12);color:var(--text);font-weight:700;}
+.pause-banner.paused{border-color:var(--accent);}
+.pause-glow{box-shadow:0 0 0 2px #ffb800;color:var(--text);}
 .chess-move-ticker{font-size:0.75em;}
 .memory-grid{grid-template-columns:repeat(4,1fr);}
 .mem-card{width:100%;height:auto;aspect-ratio:1/1;font-size:clamp(1.6em,9vw,2.6em);}
@@ -3038,6 +3052,106 @@ function startTankGame(mpMatchId,mpRole){
 
 /* -- Saving & continuing games: online chess / tic tac toe are paused (not lost) when you leave; local games autosave -- */
 const TURN_GAMES=['chess','tictactoe'];
+/* -- Pause (both players must agree) + saved online games -- */
+let pauseSeenKey='';
+function matchInfo(id,m){
+  const me=currentUser,role=m.p1Id===me.id?'p1':'p2';
+  let st={};try{st=JSON.parse(m.state||'{}');}catch(e){}
+  return {id,m,role,opp:role==='p1'?m.p2Name:m.p1Name,oppId:role==='p1'?m.p2Id:m.p1Id,
+    paused:m.status==='paused',myTurn:m.gameType==='chess'?st.turn===(role==='p1'?'w':'b'):st.turn===role};
+}
+async function fetchUnfinishedMatches(gameType){
+  const me=(typeof currentUser!=='undefined')?currentUser:null;
+  if(!me||!window._db||!window._fbFns)return [];
+  const F=window._fbFns,found=new Map();
+  const add=(id,m)=>{
+    if(!m||!TURN_GAMES.includes(m.gameType))return;
+    if(gameType&&m.gameType!==gameType)return;
+    if(m.status!=='active'&&m.status!=='paused')return;
+    if(m.p1Id!==me.id&&m.p2Id!==me.id)return;
+    found.set(id,m);
+  };
+  if(F.query&&F.where&&F.getDocs&&F.collection){                      // everything the server has for me
+    for(const field of ['p1Id','p2Id'])for(const st of ['active','paused']){
+      try{
+        const snap=await F.getDocs(F.query(F.collection(window._db,'matches'),F.where(field,'==',me.id),F.where('status','==',st)));
+        snap.forEach(d=>add(d.id,d.data()));
+      }catch(e){}
+    }
+  }
+  for(const x of getSavedMatches()){                                    // plus games remembered on this phone
+    if(found.has(x.id))continue;
+    try{const sn=await F.getDoc(F.doc(window._db,'matches',x.id));if(sn.exists())add(x.id,sn.data());else forgetMatch(x.id);}catch(e){}
+  }
+  const list=[...found.entries()].map(([id,m])=>matchInfo(id,m));
+  list.sort((a,b)=>((b.m.updatedAt&&b.m.updatedAt.seconds)||0)-((a.m.updatedAt&&a.m.updatedAt.seconds)||0));
+  return list;
+}
+function onlinePauseHtml(m,role,oppName){
+  const back=`<button class="btn-cancel" style="width:auto;padding:0 12px;" onclick="leaveOnlineMatch()">🚪 Back to games</button>`;
+  if(m.status==='paused'){
+    const ask=m.resumeRequestBy&&m.resumeRequestBy!==role;
+    return {banner:`<div class="pause-banner ${ask?'ask':'paused'}">${ask?`▶ ${escapeHtml(oppName)} wants to continue the game.<div style="margin-top:6px;"><button class="mu-save-btn" onclick="onlineResumeNow()">▶ Continue</button></div>`
+        :`⏸ Game paused &amp; saved on the server.<br><span>Continue it later from ☁️ Saved games, or by inviting ${escapeHtml(oppName)} again.</span>`}</div>`,controls:back};
+  }
+  if(m.status!=='active')return {banner:'',controls:back};
+  const req=m.pauseRequestBy||null;
+  const askedMe=req&&req!==role,askedByMe=req===role;
+  const banner=askedMe?`<div class="pause-banner ask">⏸ Your opponent wants to pause the game.<div style="margin-top:6px;"><button class="btn-cancel" style="width:auto;padding:0 12px;" onclick="onlinePauseAction('decline')">Not now</button></div><span>Press ⏸ Pause to agree and save the game.</span></div>`
+    :askedByMe?`<div class="pause-banner wait">⏳ Pause request sent — waiting for ${escapeHtml(oppName)}…</div>`
+    :`<div class="pause-banner">⏱ 3 minutes per move. To save the game and continue later, both players press ⏸ Pause.</div>`;
+  const pauseBtn=`<button class="btn-cancel ${askedMe?'pause-glow':''}" style="width:auto;padding:0 12px;" onclick="onlinePauseAction('toggle')">${askedByMe?'↩ Cancel pause':'⏸ Pause'}</button>`;
+  return {banner,controls:pauseBtn+`<button class="btn-cancel" style="width:auto;padding:0 12px;" onclick="resignOnlineMatch()">🏳️ Resign</button><button class="btn-cancel" style="width:auto;padding:0 12px;" onclick="leaveOnlineMatch()">🚪 Leave</button>`};
+}
+async function onlinePauseAction(kind){
+  const m=onlineChessMatch||onlineTttMatch;
+  if(!m||m.status!=='active'||!currentMatchId)return;
+  const {doc,updateDoc,serverTimestamp}=window._fbFns;
+  const req=m.pauseRequestBy||null;
+  let data;
+  if(kind==='decline')data={pauseRequestBy:null,pauseDeclinedBy:myMatchRole,updatedAt:serverTimestamp()};
+  else if(req&&req!==myMatchRole)data={status:'paused',pauseRequestBy:null,pausedAt:serverTimestamp(),updatedAt:serverTimestamp()};   // both agreed: saved on the server
+  else if(req===myMatchRole)data={pauseRequestBy:null,updatedAt:serverTimestamp()};
+  else data={pauseRequestBy:myMatchRole,pauseDeclinedBy:null,updatedAt:serverTimestamp()};
+  try{await updateDoc(doc(window._db,'matches',currentMatchId),data);}catch(e){showToast('❌ '+e.message);}
+}
+async function onlineResumeNow(){
+  if(!currentMatchId)return;
+  try{await activatePausedMatch(currentMatchId);}catch(e){showToast('❌ '+e.message);}
+}
+function pauseNotify(m,role){
+  const key=(m.status||'')+'|'+(m.pauseRequestBy||'')+'|'+(m.pauseDeclinedBy||'')+'|'+(m.resumeRequestBy||'');
+  if(key===pauseSeenKey)return;
+  const first=pauseSeenKey==='';
+  const prevStatus=pauseSeenKey.split('|')[0];
+  pauseSeenKey=key;
+  if(m.status==='active'&&m.pauseRequestBy&&m.pauseRequestBy!==role)showToast('⏸ Your opponent wants to pause the game');
+  else if(m.status==='active'&&!first&&!m.pauseRequestBy&&m.pauseDeclinedBy&&m.pauseDeclinedBy!==role)showToast('Your opponent does not want to pause now');
+  else if(m.status==='paused'&&!first&&prevStatus==='active')showToast('⏸ Game paused and saved');
+  else if(m.status==='active'&&!first&&prevStatus==='paused')showToast('▶ Game continued');
+}
+async function openSavedOnlineGames(game){
+  if(typeof currentUser==='undefined'||!currentUser){showToast('⚠️ Please login to play online!');openAuthModal();return;}
+  stopGameLoop();
+  document.getElementById('gameBackBtn').style.display='';
+  document.getElementById('gameBackBtn').setAttribute('onclick',"openGameModes('"+game+"')");
+  document.getElementById('gameHeadTitle').textContent='☁️ Saved games';
+  document.getElementById('gameBody').innerHTML='<div style="text-align:center;color:var(--text3);padding:20px 0;">Loading your games...</div>';
+  const list=await fetchUnfinishedMatches(game);
+  const body=document.getElementById('gameBody');
+  if(!body||document.getElementById('gameHeadTitle').textContent!=='☁️ Saved games')return;
+  body.innerHTML=list.length?`<div style="font-size:0.8em;color:var(--text3);margin-bottom:8px;">Your unfinished ${gameLabel(game)} games:</div>`+list.map(x=>`
+    <div class="mu-item">
+      <div class="mu-info"><div class="mu-name">${game==='chess'?'♟️':'⭕'} vs ${escapeHtml(x.opp||'friend')}</div>
+        <div style="font-size:0.75em;color:var(--text3);">${x.paused?'⏸ Paused &amp; saved':(x.myTurn?'🟢 Your turn':'⏳ '+escapeHtml(x.opp||'friend')+"'s turn")}</div></div>
+      <button class="mu-save-btn" onclick="continueSavedMatch('${x.id}')">▶ Continue</button>
+    </div>`).join('')
+    :`<div style="color:var(--text3);font-size:0.85em;text-align:center;padding:24px 10px;">No unfinished online games.<br><br>To save a game, press ⏸ Pause during an online match — when your opponent presses it too, the game is saved here.</div>`;
+}
+function refreshSavedBadge(game){
+  fetchUnfinishedMatches(game).then(list=>{const el=document.getElementById('savedCount');if(el&&list.length)el.textContent=' ('+list.length+')';}).catch(()=>{});
+}
+
 function getSavedMatches(){try{return JSON.parse(localStorage.getItem('savedMatches')||'[]');}catch(e){return [];}}
 function setSavedMatches(a){try{localStorage.setItem('savedMatches',JSON.stringify(a.slice(0,12)));}catch(e){}}
 function rememberMatch(id,gameType,role){
@@ -3111,13 +3225,10 @@ async function loadResumeCards(){
       const snap=await getDoc(doc(window._db,'matches',x.id));
       if(!snap.exists()){forgetMatch(x.id);continue;}
       const m=snap.data();
-      if(m.status!=='active'){forgetMatch(x.id);continue;}
-      const role=m.p1Id===me.id?'p1':(m.p2Id===me.id?'p2':null);
-      if(!role){forgetMatch(x.id);continue;}
-      const opp=role==='p1'?m.p2Name:m.p1Name;
-      const st=JSON.parse(m.state||'{}');
-      const myTurn=m.gameType==='chess'?st.turn===(role==='p1'?'w':'b'):st.turn===role;
-      cards.push(resumeCardHtml(m.gameType==='chess'?'♟️':'⭕','Continue '+gameLabel(m.gameType)+' vs '+escapeHtml(opp||'friend'),myTurn?'🟢 Your turn':'⏳ Waiting for '+escapeHtml(opp||'friend'),`openOnlineMatch('${x.id}','${role}','${m.gameType}')`));
+      if(m.status!=='active'&&m.status!=='paused'){forgetMatch(x.id);continue;}
+      if(m.p1Id!==me.id&&m.p2Id!==me.id){forgetMatch(x.id);continue;}
+      const info=matchInfo(x.id,m);
+      cards.push(resumeCardHtml(m.gameType==='chess'?'♟️':'⭕','Continue '+gameLabel(m.gameType)+' vs '+escapeHtml(info.opp||'friend'),info.paused?'⏸ Paused &amp; saved — tap to ask '+escapeHtml(info.opp||'friend')+' to continue':(info.myTurn?'🟢 Your turn':'⏳ Waiting for '+escapeHtml(info.opp||'friend')),`continueSavedMatch('${x.id}')`));
     }catch(e){}
   }
   const box2=document.getElementById('resumeCards');
@@ -3164,12 +3275,17 @@ function openGameModes(game){
   if(!g)return;
   const cont=resumeLocalCardHtml(game,false);
   document.getElementById('gameBackBtn').style.display='';
+  document.getElementById('gameBackBtn').setAttribute('onclick','showGameMenu()');
   document.getElementById('gameHeadTitle').textContent=g.title;
   document.getElementById('gameBody').innerHTML=`
-    ${cont}<div style="font-size:0.8em;color:var(--text3);margin-bottom:8px;">${cont?'Or start a new game:':'How do you want to play?'}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-size:0.8em;color:var(--text3);">${cont?'Or start a new game:':'How do you want to play?'}</div>
+      <button class="skin-btn" style="width:auto;padding:0 10px;font-size:0.78em;font-weight:700;white-space:nowrap;" onclick="openSavedOnlineGames('${game}')" title="Your unfinished online games">☁️ Saved<span id="savedCount"></span></button>
+    </div>${cont}
     <button class="game-menu-btn" onclick="${g.cpu}"><span class="game-menu-icon">🤖</span><div><div>vs Computer</div><div class="game-menu-desc">Play alone against the computer</div></div></button>
     <button class="game-menu-btn" onclick="${g.local}"><span class="game-menu-icon">🤝</span><div><div>Pass &amp; Play</div><div class="game-menu-desc">Two players, one phone — take turns on the same screen</div></div></button>
     <button class="game-menu-btn" onclick="openInvitePlayer('${game}')"><span class="game-menu-icon">🌐</span><div><div>Online Friend</div><div class="game-menu-desc">Invite a friend to play on their own phone</div></div></button>`;
+  refreshSavedBadge(game);
 }
 window.openGameModes=openGameModes;
 
@@ -3395,10 +3511,7 @@ function startRunnerGame(){
     <div class="game-canvas-wrap">
       <div class="fit"><canvas id="runnerCanvas" width="280" height="300"></canvas></div>
       <div class="game-score" id="runnerScore">Score: 0 — tap to start</div>
-      <div style="font-size:0.75em;color:var(--text3);" id="runnerBest">🏆 Best: ${best}</div>
-      <div class="skin-row" id="runnerSkinRow"></div>
-      <div style="font-size:0.68em;color:var(--text3);">◀▶ lane (right thumb) · ▲▼ jump/slide (left thumb)</div>
-      <div class="dual-controls">
+      <div class="dual-controls" style="margin-top:6px;margin-bottom:18px;">
         <div class="dual-vert">
           <button class="dpad-btn" id="rnJump">▲</button>
           <button class="dpad-btn" id="rnSlide">▼</button>
@@ -3408,6 +3521,9 @@ function startRunnerGame(){
           <button class="dpad-btn" id="rnRight">▶</button>
         </div>
       </div>
+      <div style="font-size:0.75em;color:var(--text3);" id="runnerBest">🏆 Best: ${best}</div>
+      <div class="skin-row" id="runnerSkinRow"></div>
+      <div style="font-size:0.68em;color:var(--text3);">◀▶ lane (right thumb) · ▲▼ jump/slide (left thumb)</div>
     </div>`;
   renderSkinRow('runnerSkinRow','runnerSkin');
   const canvas=document.getElementById('runnerCanvas');
@@ -4191,7 +4307,7 @@ function renderChessScreen(){
   const diffs=['easy','medium','hard','extreme'];
   const diffLabels={easy:'Easy',medium:'Medium',hard:'Hard',extreme:'Extreme'};
   document.getElementById('gameBody').innerHTML=`
-    <div class="game-canvas-wrap">
+    <div class="game-canvas-wrap chess-screen">
       <div class="skin-row">${chessLocal?'<button class="skin-btn" style="width:auto;padding:0 10px;font-size:0.72em;font-weight:700;" onclick="chessToggleLocalFlip()">🔄 Flip board</button>':diffs.map(d=>`<button class="skin-btn ${d===chessDifficulty?'selected':''}" style="width:auto;padding:0 10px;font-size:0.72em;font-weight:700;" onclick="chessSetDifficulty('${d}')">${diffLabels[d]}</button>`).join('')}</div>
       <div class="game-score" id="chessStatus">White to move</div>
       <div class="captured-row" id="capturedTop"></div>
@@ -8488,8 +8604,7 @@ function filterInvitablePlayers(){
   const filtered=(window._invitablePlayers||[]).filter(p=>p.name.toLowerCase().includes(q));
   renderInvitablePlayersList(filtered);
 }
-async function sendMatchInvite(toId,toName){
-  const gameType=window._inviteGameType;
+async function createMatchInvite(toId,toName,gameType){
   const {collection,addDoc,serverTimestamp}=window._fbFns;
   try{
     const matchRef=await addDoc(collection(window._db,'matches'),{
@@ -8506,24 +8621,87 @@ async function sendMatchInvite(toId,toName){
     openMatchWaitingRoom(matchRef.id,gameType,toName);
   }catch(e){showToast('❌ '+e.message);}
 }
-function openMatchWaitingRoom(matchId,gameType,opponentName){
+async function sendMatchInvite(toId,toName){
+  const gameType=window._inviteGameType;
+  if(TURN_GAMES.includes(gameType)){
+    try{
+      const found=(await fetchUnfinishedMatches(gameType)).find(x=>x.oppId===toId);
+      if(found){showContinueOrNewDialog(found,toId,toName,gameType);return;}   // unfinished game with this person: ask first
+    }catch(e){}
+  }
+  await createMatchInvite(toId,toName,gameType);
+}
+function showContinueOrNewDialog(x,toId,toName,gameType){
+  const old=document.getElementById('contNewDlg');if(old)old.remove();
+  window._contNew={x,toId,toName,gameType};
+  const d=document.createElement('div');
+  d.id='contNewDlg';
+  d.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;padding:20px;';
+  d.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;max-width:340px;width:100%;text-align:center;">
+    <div style="font-size:2em;">${gameType==='chess'?'♟️':'⭕'}</div>
+    <div style="font-weight:800;margin:6px 0;">You have an unfinished ${gameLabel(gameType)} game with ${escapeHtml(toName)}</div>
+    <div style="font-size:0.85em;color:var(--text3);margin-bottom:12px;">${x.paused?'⏸ It was paused and saved. ':''}Do you want to continue your last game or play a new game?</div>
+    <button class="cat-add-btn" style="width:100%;margin-bottom:8px;" onclick="contNewChoose('continue')">▶ Continue last game</button>
+    <button class="btn-cancel" style="width:100%;margin-bottom:8px;" onclick="contNewChoose('new')">🆕 Play a new game</button>
+    <button class="btn-cancel" style="width:100%;" onclick="contNewChoose('cancel')">Cancel</button></div>`;
+  document.body.appendChild(d);
+}
+async function contNewChoose(choice){
+  const d=document.getElementById('contNewDlg');if(d)d.remove();
+  const c=window._contNew;window._contNew=null;
+  if(!c||choice==='cancel')return;
+  if(choice==='continue')await continueSavedMatch(c.x.id);
+  else await createMatchInvite(c.toId,c.toName,c.gameType);
+}
+async function continueSavedMatch(id){
+  if(!currentUser){showToast('⚠️ Please login to play online!');openAuthModal();return;}
+  const {doc,getDoc}=window._fbFns;
+  try{
+    const snap=await getDoc(doc(window._db,'matches',id));
+    if(!snap.exists()){forgetMatch(id);showToast('This game no longer exists.');return;}
+    const m=snap.data(),info=matchInfo(id,m);
+    if(m.p1Id!==currentUser.id&&m.p2Id!==currentUser.id){forgetMatch(id);return;}      // a saved game belongs only to its two players
+    if(m.status==='active'){openGames();openOnlineMatch(id,info.role,m.gameType);return;}
+    if(m.status!=='paused'){forgetMatch(id);showToast('This game has already ended.');return;}
+    await sendResumeInvite(id,m,info);
+  }catch(e){showToast('❌ '+e.message);}
+}
+async function sendResumeInvite(id,m,info){
+  const {collection,addDoc,doc,updateDoc,serverTimestamp}=window._fbFns;
+  await updateDoc(doc(window._db,'matches',id),{resumeRequestBy:info.role,resumeResponse:null,updatedAt:serverTimestamp()});
+  await addDoc(collection(window._db,'inbox'),{
+    toUserId:info.oppId,fromId:currentUser.id,fromName:currentUser.name,
+    message:currentUser.name+' wants to continue your paused '+gameLabel(m.gameType)+' game!',
+    type:'matchInvite',matchId:id,gameType:m.gameType,resume:true,createdAt:serverTimestamp(),read:false
+  });
+  showToast('📨 Asked '+info.opp+' to continue the game');
+  openMatchWaitingRoom(id,m.gameType,info.opp,{resume:true,role:info.role});
+}
+function openMatchWaitingRoom(matchId,gameType,opponentName,opts){
+  const resume=!!(opts&&opts.resume);
+  document.getElementById('gameBackBtn').setAttribute('onclick',(resume?'cancelResumeInvite':'cancelMatchInvite')+"('"+matchId+"')");   // ← cancels the request instead of leaving a listener running
   document.getElementById('gameHeadTitle').textContent='⏳ Waiting...';
   document.getElementById('gameBody').innerHTML=`
     <div style="text-align:center;padding:30px 10px;">
       <div style="font-size:2.5em;">⏳</div>
       <div style="margin-top:10px;font-weight:700;">Waiting for ${escapeHtml(opponentName)} to accept...</div>
-      <div style="font-size:0.8em;color:var(--text3);margin-top:6px;">${gameLabel(gameType)} invite sent</div>
-      <button class="btn-cancel" style="margin-top:16px;" onclick="cancelMatchInvite('${matchId}')">Cancel Invite</button>
+      <div style="font-size:0.8em;color:var(--text3);margin-top:6px;">${resume?'Request to continue your saved '+gameLabel(gameType)+' game sent':gameLabel(gameType)+' invite sent'}</div>
+      <button class="btn-cancel" style="margin-top:16px;" onclick="${resume?'cancelResumeInvite':'cancelMatchInvite'}('${matchId}')">${resume?'Cancel Request':'Cancel Invite'}</button>
     </div>`;
-  const {doc,onSnapshot}=window._fbFns;
+  const {doc,onSnapshot,updateDoc}=window._fbFns;
   if(matchWaitUnsub)matchWaitUnsub();
   matchWaitUnsub=onSnapshot(doc(window._db,'matches',matchId),snap=>{
     if(!snap.exists())return;
     const m=snap.data();
     if(m.status==='active'){
       if(matchWaitUnsub){matchWaitUnsub();matchWaitUnsub=null;}
-      openOnlineMatch(matchId,'p1',m.gameType);
-    }else if(m.status==='declined'){
+      openOnlineMatch(matchId,(opts&&opts.role)||'p1',m.gameType);
+    }else if(resume&&m.status==='paused'&&m.resumeResponse==='declined'){
+      if(matchWaitUnsub){matchWaitUnsub();matchWaitUnsub=null;}
+      updateDoc(doc(window._db,'matches',matchId),{resumeRequestBy:null,resumeResponse:null}).catch(()=>{});
+      showToast('😢 '+opponentName+' did not want to continue now. The game is still saved.');
+      showGameMenu();
+    }else if(!resume&&m.status==='declined'){
       if(matchWaitUnsub){matchWaitUnsub();matchWaitUnsub=null;}
       showToast('😢 '+opponentName+' declined the invite.');
       showGameMenu();
@@ -8536,12 +8714,31 @@ async function cancelMatchInvite(matchId){
   try{await deleteDoc(doc(window._db,'matches',matchId));}catch(e){}
   showGameMenu();
 }
+async function cancelResumeInvite(matchId){
+  if(matchWaitUnsub){matchWaitUnsub();matchWaitUnsub=null;}
+  const {doc,updateDoc}=window._fbFns;
+  try{await updateDoc(doc(window._db,'matches',matchId),{resumeRequestBy:null});}catch(e){}     // the saved game is kept
+  showGameMenu();
+}
+async function activatePausedMatch(matchId){
+  const {doc,updateDoc,serverTimestamp}=window._fbFns;
+  await updateDoc(doc(window._db,'matches',matchId),{status:'active',resumeRequestBy:null,resumeResponse:null,pauseRequestBy:null,pauseDeclinedBy:null,turnStartedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+}
 async function acceptMatchInvite(matchId,inboxId){
   const {doc,getDoc,updateDoc,deleteDoc,serverTimestamp}=window._fbFns;
   try{
     const matchSnap=await getDoc(doc(window._db,'matches',matchId));
     if(!matchSnap.exists()){showToast('❌ This invite is no longer available.');await deleteInboxMessage(inboxId);return;}
     const m=matchSnap.data();
+    if(m.status==='paused'||m.status==='active'){                       // continuing a saved game: the board is NOT reset
+      const role=m.p1Id===currentUser.id?'p1':(m.p2Id===currentUser.id?'p2':null);
+      if(!role||(m.status==='paused'&&!m.resumeRequestBy)){showToast('❌ This request is no longer available.');await deleteInboxMessage(inboxId);return;}
+      if(m.status==='paused')await activatePausedMatch(matchId);
+      await deleteDoc(doc(window._db,'inbox',inboxId));
+      closeInbox();openGames();openOnlineMatch(matchId,role,m.gameType);
+      return;
+    }
+    if(m.status!=='pending'){showToast('❌ This invite is no longer available.');await deleteInboxMessage(inboxId);return;}
     const initState=m.gameType==='chess'
       ?JSON.stringify({board:chessInitBoard(),castling:{wK:true,wQ:true,bK:true,bQ:true},enPassant:null,turn:'w',capturedLog:[]})
       :(m.gameType==='shadowduel'||m.gameType==='shadowclash'||m.gameType==='tankbattle')
@@ -8555,9 +8752,11 @@ async function acceptMatchInvite(matchId,inboxId){
   }catch(e){showToast('❌ '+e.message);}
 }
 async function declineMatchInvite(matchId,inboxId){
-  const {doc,updateDoc,deleteDoc}=window._fbFns;
+  const {doc,getDoc,updateDoc,deleteDoc}=window._fbFns;
   try{
-    await updateDoc(doc(window._db,'matches',matchId),{status:'declined'});
+    const snap=await getDoc(doc(window._db,'matches',matchId));
+    if(snap.exists()&&snap.data().status==='paused')await updateDoc(doc(window._db,'matches',matchId),{resumeRequestBy:null,resumeResponse:'declined'});   // saved game stays saved
+    else if(snap.exists())await updateDoc(doc(window._db,'matches',matchId),{status:'declined'});
     await deleteDoc(doc(window._db,'inbox',inboxId));
     showToast('Invite declined');
   }catch(e){showToast('❌ '+e.message);}
@@ -8582,7 +8781,7 @@ async function forfeitCurrentMatchIfActive(){
 }
 async function leaveOnlineMatch(){
   await forfeitCurrentMatchIfActive();
-  {const mm=onlineChessMatch||onlineTttMatch;if(mm&&mm.status!=='active'&&currentMatchId)forgetMatch(currentMatchId);}
+  {const mm=onlineChessMatch||onlineTttMatch;if(mm&&mm.status==='finished'&&currentMatchId)forgetMatch(currentMatchId);}
   if(onlineTttUnsub){onlineTttUnsub();onlineTttUnsub=null;}
   if(onlineChessUnsub){onlineChessUnsub();onlineChessUnsub=null;}
   if(onlineSdUnsub){onlineSdUnsub();onlineSdUnsub=null;}
@@ -8596,7 +8795,7 @@ function matchEndReason(m,role){
   if(m.endReason==='left')return m.winner===role?' (opponent left the match)':'';
   return '';
 }
-const MOVE_TIME_LIMIT=86400; // 24 hours per move: you can leave and come back later
+const MOVE_TIME_LIMIT=180; // 3 minutes per move
 let moveTimerInterval=null,moveTimeoutTriggered=false;
 function stopMoveTimer(){
   if(moveTimerInterval){clearInterval(moveTimerInterval);moveTimerInterval=null;}
@@ -8635,6 +8834,7 @@ function startOnlineTTT(matchId,role){
   document.getElementById('gameBackBtn').setAttribute('onclick','leaveOnlineMatch()');
   document.getElementById('gameHeadTitle').textContent='⭕ Online Tic Tac Toe';
   const {doc,onSnapshot}=window._fbFns;
+  pauseSeenKey='';
   if(onlineTttUnsub)onlineTttUnsub();
   onlineTttUnsub=onSnapshot(doc(window._db,'matches',matchId),snap=>{
     if(!snap.exists()){showToast('Match no longer available.');leaveOnlineMatch();return;}
@@ -8661,7 +8861,9 @@ function renderOnlineTtt(role){
   if(m.status==='finished'){
     const reason=matchEndReason(m,role);
     status=m.winner==='draw'?"🤝 It's a draw!":(m.winner===role?'🎉 You win!'+reason:'😢 '+oppName+' wins!'+reason);
-  }else status=isMyTurn?'Your turn ('+mySymbol+')':oppName+"'s turn";
+  }else if(m.status==='paused')status='⏸ Game paused';
+  else status=isMyTurn?'Your turn ('+mySymbol+')':oppName+"'s turn";
+  const pauseUi=onlinePauseHtml(m,role,oppName);pauseNotify(m,role);
   document.getElementById('gameBody').innerHTML=`
     <div class="game-canvas-wrap">
       <div style="font-size:0.8em;color:var(--text3);">vs ${escapeHtml(oppName)}</div>
@@ -8671,8 +8873,8 @@ function renderOnlineTtt(role){
       </div>
       <div class="game-score">${status}</div>
       <div class="game-move-timer" id="tttTimer" style="font-size:0.78em;color:var(--text3);"></div>
-      ${m.status==='active'?`<div style="font-size:0.72em;color:var(--text3);">💾 Match is saved — you can leave and continue any time</div>
-      <div style="display:flex;gap:8px;"><button class="btn-cancel" onclick="leaveOnlineMatch()">⏸ Pause &amp; leave</button><button class="btn-cancel" onclick="resignOnlineMatch()">🏳️ Resign</button></div>`:`<button class="btn-cancel" onclick="leaveOnlineMatch()">🚪 Back to games</button>`}
+      ${pauseUi.banner}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">${pauseUi.controls}</div>
     </div>`;
 }
 async function onlineTttMove(i){
@@ -8698,7 +8900,7 @@ function startOnlineChess(matchId,role){
   document.getElementById('gameHeadTitle').textContent='♟️ Online Chess';
   chessSelected=null;chessLegalForSel=[];
   chessBoardFlipped=(role==='p2');
-  onlineChessSeenKey=undefined;
+  onlineChessSeenKey=undefined;pauseSeenKey='';
   const {doc,onSnapshot}=window._fbFns;
   if(onlineChessUnsub)onlineChessUnsub();
   onlineChessUnsub=onSnapshot(doc(window._db,'matches',matchId),snap=>{
@@ -8722,14 +8924,17 @@ function renderOnlineChess(role){
   if(m.status==='finished'){
     const reason=matchEndReason(m,role);
     statusText=m.winner==='draw'?'🤝 Draw!':(m.winner===role?'🎉 You win!'+reason:'😢 '+oppName+' wins!'+reason);
+  }else if(m.status==='paused'){
+    statusText='⏸ Game paused';
   }else{
     const inCheck=chessInCheck(state,state.turn);
     const isMyTurn=state.turn===myColor;
     statusText=(inCheck?'⚠️ Check! ':'')+(isMyTurn?'Your turn':oppName+"'s turn");
   }
   const moverLabel=m.lastMove&&m.lastMove.piece?(m.lastMove.piece[0]===myColor?'You':oppName):'';
+  const pauseUi=onlinePauseHtml(m,role,oppName);pauseNotify(m,role);
   document.getElementById('gameBody').innerHTML=`
-    <div class="game-canvas-wrap">
+    <div class="game-canvas-wrap chess-screen">
       <div style="font-size:0.8em;color:var(--text3);">vs ${escapeHtml(oppName)} — you're ${myColor==='w'?'White':'Black'}</div>
       <div class="game-score" id="chessStatus">${statusText}</div>
       <div class="captured-row">⚔️ ${chessCapturedRowHtml(state.capturedLog,myColor==='w'?'b':'w')}</div>
@@ -8739,10 +8944,10 @@ function renderOnlineChess(role){
       </div>
       <div class="captured-row">⚔️ ${chessCapturedRowHtml(state.capturedLog,myColor)}</div>
       <div class="game-move-timer" id="chessTimer" style="font-size:0.78em;color:var(--text3);"></div>
-      ${m.status==='active'?'<div style="font-size:0.72em;color:var(--text3);">💾 Match is saved — you can leave and continue any time</div>':''}
+      ${pauseUi.banner}
       <div class="game-controls">
         <button class="btn-cancel" onclick="toggleChessBoardFlip()" title="Flip board view">🔄</button>
-        ${m.status==='active'?`<button class="btn-cancel" style="width:auto;padding:0 12px;" onclick="leaveOnlineMatch()">⏸ Pause</button><button class="btn-cancel" style="width:auto;padding:0 12px;" onclick="resignOnlineMatch()">🏳️ Resign</button>`:`<button class="btn-cancel" style="width:auto;padding:0 12px;" onclick="leaveOnlineMatch()">🚪 Back</button>`}
+        ${pauseUi.controls}
       </div>
     </div>`;
   renderOnlineChessBoard(state,myColor,m.status,m.lastMove);
