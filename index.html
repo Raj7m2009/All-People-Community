@@ -3036,12 +3036,100 @@ function startTankGame(mpMatchId,mpRole){
   }
 }
 
+/* -- Saving & continuing games: online chess / tic tac toe are paused (not lost) when you leave; local games autosave -- */
+const TURN_GAMES=['chess','tictactoe'];
+function getSavedMatches(){try{return JSON.parse(localStorage.getItem('savedMatches')||'[]');}catch(e){return [];}}
+function setSavedMatches(a){try{localStorage.setItem('savedMatches',JSON.stringify(a.slice(0,12)));}catch(e){}}
+function rememberMatch(id,gameType,role){
+  if(!TURN_GAMES.includes(gameType))return;
+  const uid=(typeof currentUser!=='undefined'&&currentUser)?currentUser.id:null;
+  setSavedMatches([{id,gameType,role,uid}].concat(getSavedMatches().filter(x=>x.id!==id)));
+}
+function forgetMatch(id){setSavedMatches(getSavedMatches().filter(x=>x.id!==id));}
+async function resignOnlineMatch(){
+  const m=onlineChessMatch||onlineTttMatch;
+  if(!m||m.status!=='active'||!currentMatchId)return;
+  if(!confirm('Resign this game? Your opponent will win.'))return;
+  const {doc,updateDoc}=window._fbFns;
+  try{await updateDoc(doc(window._db,'matches',currentMatchId),{status:'finished',winner:myMatchRole==='p1'?'p2':'p1',endReason:'resigned'});}catch(e){showToast('❌ '+e.message);}
+}
+function chessSave(){
+  try{
+    if(!chessState)return;
+    if(chessOver||chessGameStatus(chessState)!=='ongoing'){localStorage.removeItem('chessSave');return;}
+    if(!chessLastMove)return;                                   // nothing played yet: keep the older save
+    localStorage.setItem('chessSave',JSON.stringify({state:chessState,last:chessLastMove,local:chessLocal,diff:chessDifficulty,flip:chessLocalFlip}));
+  }catch(e){}
+}
+function chessLoadSave(){try{const o=JSON.parse(localStorage.getItem('chessSave')||'null');return o&&o.state&&o.state.board?o:null;}catch(e){return null;}}
+function chessResume(){
+  const sv=chessLoadSave();if(!sv){startChessGame();return;}
+  stopGameLoop();
+  document.getElementById('gameBackBtn').style.display='';
+  document.getElementById('gameHeadTitle').textContent='♟️ Chess';
+  chessState=sv.state;chessLastMove=sv.last||null;chessLocal=!!sv.local;chessDifficulty=sv.diff||'medium';chessLocalFlip=!!sv.flip;
+  chessSelected=null;chessLegalForSel=[];chessThinking=false;chessOver=false;
+  renderChessScreen();
+  if(!chessLocal&&chessState.turn==='b')setTimeout(chessAiTurn,300);   // the computer still owed a move
+}
+function tttSave(){
+  try{
+    if(tttOver){localStorage.removeItem('tttSave');return;}
+    if(!tttBoard.some(x=>x))return;
+    localStorage.setItem('tttSave',JSON.stringify({board:tttBoard,turn:tttTurn,local:tttLocal,tally:tttTally}));
+  }catch(e){}
+}
+function tttLoadSave(){try{const o=JSON.parse(localStorage.getItem('tttSave')||'null');return o&&Array.isArray(o.board)&&o.board.length===9?o:null;}catch(e){return null;}}
+function tttResume(){
+  const sv=tttLoadSave();if(!sv){startTicTacToe();return;}
+  stopGameLoop();
+  document.getElementById('gameBackBtn').style.display='';
+  document.getElementById('gameHeadTitle').textContent='⭕ Tic Tac Toe';
+  tttBoard=sv.board;tttTurn=sv.turn||'X';tttLocal=!!sv.local;tttTally=sv.tally||{x:0,o:0,d:0};tttOver=false;
+  renderTttBoard(tttLocal?(tttTurn==='X'?"Player 1's turn (X)":"Player 2's turn (O)"):'Your turn (X)');
+}
+function resumeCardHtml(icon,title,desc,onclick){
+  return `<button class="game-menu-btn" style="border-color:var(--accent);" onclick="${onclick}"><span class="game-menu-icon">${icon}</span><div><div>${title}</div><div class="game-menu-desc">${desc}</div></div></button>`;
+}
+function resumeLocalCardHtml(game,short){
+  if(game==='chess'){const sv=chessLoadSave();return sv?resumeCardHtml('▶️',short?'Continue Chess':'Continue saved game',(sv.local?'Pass &amp; Play':'vs Computer')+' · '+(sv.state.turn==='w'?'White':'Black')+' to move','chessResume()'):'';}
+  const sv=tttLoadSave();return sv?resumeCardHtml('▶️',short?'Continue Tic Tac Toe':'Continue saved game',(sv.local?'Pass &amp; Play':'vs Computer')+' · game in progress','tttResume()'):'';
+}
+async function loadResumeCards(){
+  const box=document.getElementById('resumeCards');
+  if(!box)return;
+  const local=resumeLocalCardHtml('chess',true)+resumeLocalCardHtml('ttt',true);
+  box.innerHTML=local;
+  const me=(typeof currentUser!=='undefined'&&currentUser)?currentUser:null;
+  if(!me||!window._db||!window._fbFns)return;
+  const saved=getSavedMatches().filter(x=>!x.uid||x.uid===me.id);
+  if(!saved.length)return;
+  const {doc,getDoc}=window._fbFns;
+  const cards=[];
+  for(const x of saved){
+    try{
+      const snap=await getDoc(doc(window._db,'matches',x.id));
+      if(!snap.exists()){forgetMatch(x.id);continue;}
+      const m=snap.data();
+      if(m.status!=='active'){forgetMatch(x.id);continue;}
+      const role=m.p1Id===me.id?'p1':(m.p2Id===me.id?'p2':null);
+      if(!role){forgetMatch(x.id);continue;}
+      const opp=role==='p1'?m.p2Name:m.p1Name;
+      const st=JSON.parse(m.state||'{}');
+      const myTurn=m.gameType==='chess'?st.turn===(role==='p1'?'w':'b'):st.turn===role;
+      cards.push(resumeCardHtml(m.gameType==='chess'?'♟️':'⭕','Continue '+gameLabel(m.gameType)+' vs '+escapeHtml(opp||'friend'),myTurn?'🟢 Your turn':'⏳ Waiting for '+escapeHtml(opp||'friend'),`openOnlineMatch('${x.id}','${role}','${m.gameType}')`));
+    }catch(e){}
+  }
+  const box2=document.getElementById('resumeCards');
+  if(box2)box2.innerHTML=local+cards.join('');
+}
 function showGameMenu(){
   stopGameLoop();
   try{document.getElementById('gameBackBtn').setAttribute('onclick','showGameMenu()');}catch(e){}
   document.getElementById('gameBackBtn').style.display='none';
   document.getElementById('gameHeadTitle').textContent='🎮 Mini Games';
   document.getElementById('gameBody').innerHTML=`
+    <div id="resumeCards"></div>
     <button class="game-menu-btn" onclick="openGameModes('tictactoe')"><span class="game-menu-icon">⭕</span><div><div>Tic Tac Toe</div><div class="game-menu-desc">X vs O — play the computer, a friend on this phone, or online</div></div></button>
     <button class="game-menu-btn" onclick="startRunnerGame()"><span class="game-menu-icon">🏃</span><div><div>Lane Dash</div><div class="game-menu-desc">Endless runner — dodge, jump and slide past obstacles</div></div></button>
     <button class="game-menu-btn" onclick="startSkyHopper()"><span class="game-menu-icon">🛸</span><div><div>Sky Hopper</div><div class="game-menu-desc">Tap to fly through the gates without crashing</div></div></button>
@@ -3066,6 +3154,7 @@ function showGameMenu(){
       <button class="game-online-btn" onclick="openInvitePlayer('tankbattle')" title="Play a friend online">👥</button>
     </div>
   `;
+  loadResumeCards();
 }
 
 /* -- Mode picker for 2-player games: vs Computer · Pass & Play (one phone) · Online -- */
@@ -3073,10 +3162,11 @@ function openGameModes(game){
   stopGameLoop();
   const g={tictactoe:{title:'⭕ Tic Tac Toe',cpu:'startTicTacToe()',local:'startTicTacToe(true)'},chess:{title:'♟️ Chess',cpu:'startChessGame()',local:'startChessGame(true)'}}[game];
   if(!g)return;
+  const cont=resumeLocalCardHtml(game,false);
   document.getElementById('gameBackBtn').style.display='';
   document.getElementById('gameHeadTitle').textContent=g.title;
   document.getElementById('gameBody').innerHTML=`
-    <div style="font-size:0.8em;color:var(--text3);margin-bottom:8px;">How do you want to play?</div>
+    ${cont}<div style="font-size:0.8em;color:var(--text3);margin-bottom:8px;">${cont?'Or start a new game:':'How do you want to play?'}</div>
     <button class="game-menu-btn" onclick="${g.cpu}"><span class="game-menu-icon">🤖</span><div><div>vs Computer</div><div class="game-menu-desc">Play alone against the computer</div></div></button>
     <button class="game-menu-btn" onclick="${g.local}"><span class="game-menu-icon">🤝</span><div><div>Pass &amp; Play</div><div class="game-menu-desc">Two players, one phone — take turns on the same screen</div></div></button>
     <button class="game-menu-btn" onclick="openInvitePlayer('${game}')"><span class="game-menu-icon">🌐</span><div><div>Online Friend</div><div class="game-menu-desc">Invite a friend to play on their own phone</div></div></button>`;
@@ -3094,6 +3184,7 @@ function startTicTacToe(local,keepTally){
   renderTttBoard(tttLocal?"Player 1's turn (X)":'Your turn (X)');
 }
 function renderTttBoard(status){
+  tttSave();
   document.getElementById('gameBody').innerHTML=`
     <div class="game-canvas-wrap">
       <div class="fit"><div class="ttt-board">${tttBoard.map((v,i)=>`<button class="ttt-cell ${v==='O'?'o':''}" ${v||tttOver?'disabled':''} onclick="tttMove(${i})">${v}</button>`).join('')}</div></div>
@@ -4055,10 +4146,11 @@ function startChessGame(local){
   document.getElementById('gameHeadTitle').textContent='♟️ Chess';
   chessDifficulty=localStorage.getItem('chessDifficulty')||'medium';
   chessLocal=!!local;chessLocalFlip=false;
-  chessResetGame();
+  chessResetGame(true);                        // keep an older saved game until the first move of the new one
   renderChessScreen();
 }
-function chessResetGame(){
+function chessResetGame(keepSave){
+  if(!keepSave){try{localStorage.removeItem('chessSave');}catch(e){}}
   chessState={board:chessInitBoard(),turn:'w',castling:{wK:true,wQ:true,bK:true,bQ:true},enPassant:null,capturedLog:[]};
   chessSelected=null;chessLegalForSel=[];chessThinking=false;chessOver=false;chessLastMove=null;
 }
@@ -4160,6 +4252,7 @@ function renderChessBoard(){
     statusEl.textContent=(inCheck?'⚠️ Check! ':'')+turnLabel+' to move';
     chessOver=false;
   }
+  chessSave();
 }
 function chessToggleLocalFlip(){chessLocalFlip=!chessLocalFlip;renderChessBoard();}
 window.chessToggleLocalFlip=chessToggleLocalFlip;
@@ -4197,7 +4290,7 @@ function chessAiTurn(){
     const move=chessChooseAiMove(chessState,chessDifficulty);
     if(move){
       chessMakeMove(chessState,move);
-      chessLastMove={fromR:move.fromR,fromC:move.fromC,toR:move.toR,toC:move.toC,piece:move.piece};
+      chessLastMove={fromR:move.fromR,fromC:move.fromC,toR:move.toR,toC:move.toC,piece:move.piece,cap:move.captured||null,ep:!!move.isEnPassant};
     }
     chessThinking=false;
     renderChessBoard();
@@ -8471,6 +8564,7 @@ async function declineMatchInvite(matchId,inboxId){
 }
 function openOnlineMatch(matchId,role,gameType){
   currentMatchId=matchId;myMatchRole=role;
+  rememberMatch(matchId,gameType,role);
   if(gameType==='chess')startOnlineChess(matchId,role);
   else if(gameType==='shadowduel')startShadowDuel(matchId,role);
   else if(gameType==='shadowclash')startBodyClash(matchId,role);
@@ -8480,7 +8574,7 @@ function openOnlineMatch(matchId,role,gameType){
 async function forfeitCurrentMatchIfActive(){
   if(!currentMatchId||!myMatchRole)return;
   const m=onlineChessMatch||onlineTttMatch||onlineSdMatch;
-  if(m&&m.status==='active'){
+  if(m&&m.status==='active'&&!TURN_GAMES.includes(m.gameType)){   // chess / tic tac toe are only paused when you leave; fast live games still end
     const winnerRole=myMatchRole==='p1'?'p2':'p1';
     const {doc,updateDoc}=window._fbFns;
     try{await updateDoc(doc(window._db,'matches',currentMatchId),{status:'finished',winner:winnerRole,endReason:'left'});}catch(e){}
@@ -8488,6 +8582,7 @@ async function forfeitCurrentMatchIfActive(){
 }
 async function leaveOnlineMatch(){
   await forfeitCurrentMatchIfActive();
+  {const mm=onlineChessMatch||onlineTttMatch;if(mm&&mm.status!=='active'&&currentMatchId)forgetMatch(currentMatchId);}
   if(onlineTttUnsub){onlineTttUnsub();onlineTttUnsub=null;}
   if(onlineChessUnsub){onlineChessUnsub();onlineChessUnsub=null;}
   if(onlineSdUnsub){onlineSdUnsub();onlineSdUnsub=null;}
@@ -8497,10 +8592,11 @@ async function leaveOnlineMatch(){
 }
 function matchEndReason(m,role){
   if(m.endReason==='timeout')return ' (ran out of time)';
+  if(m.endReason==='resigned')return m.winner===role?' (opponent resigned)':'';
   if(m.endReason==='left')return m.winner===role?' (opponent left the match)':'';
   return '';
 }
-const MOVE_TIME_LIMIT=300; // 5 minutes per move
+const MOVE_TIME_LIMIT=86400; // 24 hours per move: you can leave and come back later
 let moveTimerInterval=null,moveTimeoutTriggered=false;
 function stopMoveTimer(){
   if(moveTimerInterval){clearInterval(moveTimerInterval);moveTimerInterval=null;}
@@ -8516,7 +8612,7 @@ function startMoveTimer(getMatch,getTurnRole,timerElId){
     const el=document.getElementById(timerElId);
     if(el){
       const mm=Math.floor(remaining/60),ss=remaining%60;
-      el.textContent='⏱ '+mm+':'+String(ss).padStart(2,'0')+' left to move';
+      el.textContent=remaining>=3600?'⏱ '+Math.floor(remaining/3600)+'h '+Math.floor(remaining%3600/60)+'m left to move':'⏱ '+mm+':'+String(ss).padStart(2,'0')+' left to move';
       el.style.color=remaining<=30?'#ff4757':'';
     }
     if(remaining<=0&&!moveTimeoutTriggered){
@@ -8536,6 +8632,7 @@ async function handleMoveTimeout(turnRole){
 /* -- Online Tic Tac Toe -- */
 function startOnlineTTT(matchId,role){
   document.getElementById('gameBackBtn').style.display='';
+  document.getElementById('gameBackBtn').setAttribute('onclick','leaveOnlineMatch()');
   document.getElementById('gameHeadTitle').textContent='⭕ Online Tic Tac Toe';
   const {doc,onSnapshot}=window._fbFns;
   if(onlineTttUnsub)onlineTttUnsub();
@@ -8574,7 +8671,8 @@ function renderOnlineTtt(role){
       </div>
       <div class="game-score">${status}</div>
       <div class="game-move-timer" id="tttTimer" style="font-size:0.78em;color:var(--text3);"></div>
-      <button class="btn-cancel" onclick="leaveOnlineMatch()">🚪 Leave Match</button>
+      ${m.status==='active'?`<div style="font-size:0.72em;color:var(--text3);">💾 Match is saved — you can leave and continue any time</div>
+      <div style="display:flex;gap:8px;"><button class="btn-cancel" onclick="leaveOnlineMatch()">⏸ Pause &amp; leave</button><button class="btn-cancel" onclick="resignOnlineMatch()">🏳️ Resign</button></div>`:`<button class="btn-cancel" onclick="leaveOnlineMatch()">🚪 Back to games</button>`}
     </div>`;
 }
 async function onlineTttMove(i){
@@ -8596,6 +8694,7 @@ async function onlineTttMove(i){
 let chessBoardFlipped=false,onlineChessSeenKey;
 function startOnlineChess(matchId,role){
   document.getElementById('gameBackBtn').style.display='';
+  document.getElementById('gameBackBtn').setAttribute('onclick','leaveOnlineMatch()');
   document.getElementById('gameHeadTitle').textContent='♟️ Online Chess';
   chessSelected=null;chessLegalForSel=[];
   chessBoardFlipped=(role==='p2');
@@ -8640,9 +8739,10 @@ function renderOnlineChess(role){
       </div>
       <div class="captured-row">⚔️ ${chessCapturedRowHtml(state.capturedLog,myColor)}</div>
       <div class="game-move-timer" id="chessTimer" style="font-size:0.78em;color:var(--text3);"></div>
+      ${m.status==='active'?'<div style="font-size:0.72em;color:var(--text3);">💾 Match is saved — you can leave and continue any time</div>':''}
       <div class="game-controls">
         <button class="btn-cancel" onclick="toggleChessBoardFlip()" title="Flip board view">🔄</button>
-        <button class="btn-cancel" onclick="leaveOnlineMatch()">🚪 Leave</button>
+        ${m.status==='active'?`<button class="btn-cancel" style="width:auto;padding:0 12px;" onclick="leaveOnlineMatch()">⏸ Pause</button><button class="btn-cancel" style="width:auto;padding:0 12px;" onclick="resignOnlineMatch()">🏳️ Resign</button>`:`<button class="btn-cancel" style="width:auto;padding:0 12px;" onclick="leaveOnlineMatch()">🚪 Back</button>`}
       </div>
     </div>`;
   renderOnlineChessBoard(state,myColor,m.status,m.lastMove);
@@ -8685,7 +8785,7 @@ function onlineChessSquareClick(r,c){
   const p=state.board[r][c];
   if(chessSelected){
     const move=chessLegalForSel.find(mv=>mv.toR===r&&mv.toC===c);
-    if(move){const mv={fromR:move.fromR,fromC:move.fromC,toR:move.toR,toC:move.toC,piece:move.piece};chessMakeMove(state,move);chessSelected=null;chessLegalForSel=[];pushOnlineChessMove(state,mv);return;}
+    if(move){const mv={fromR:move.fromR,fromC:move.fromC,toR:move.toR,toC:move.toC,piece:move.piece,cap:move.captured||null,ep:!!move.isEnPassant};chessMakeMove(state,move);chessSelected=null;chessLegalForSel=[];pushOnlineChessMove(state,mv);return;}
     if(p&&p[0]===myColor){chessSelected=[r,c];chessLegalForSel=chessLegalMoves(state,myColor).filter(mv=>mv.fromR===r&&mv.fromC===c);}
     else{chessSelected=null;chessLegalForSel=[];}
   }else if(p&&p[0]===myColor){
